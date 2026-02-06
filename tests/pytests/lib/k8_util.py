@@ -87,6 +87,33 @@ def k8_init_cluster(k8_cluster : common.k8_cluster, namespaces):
     return
 
 @log_arguments
+def k8_get_version():
+    """
+    Get Kubernetes cluster version information
+
+    Returns:
+        tuple: (ret_code, version_info_dict) where version_info_dict contains:
+            - major: major version
+            - minor: minor version
+            - git_version: full git version string
+    """
+    global Logger
+
+    try:
+        version_api = client.VersionApi()
+        version_info = version_api.get_code()
+
+        return 0, {
+            "major": version_info.major,
+            "minor": version_info.minor,
+            "git_version": version_info.git_version,
+            "platform": version_info.platform,
+        }
+    except Exception as e:
+        Logger.error(f"Failed to get Kubernetes version: {e}")
+        return 1, {}
+
+@log_arguments
 def k8_get_nodes() -> (int, str, K8Items):
     """
     API to get nodes from k8 cluster
@@ -410,6 +437,36 @@ def k8_get_custom_resource_objects(group : str, version : str, plural : str) -> 
         return 0, cr_info['items'], None
     except ApiException as e:
         Logger.error(f"Failed to query deviceconfig CR, error: {e}")
+        return -1, None, str(e)
+
+@log_arguments
+def k8_get_namespaced_custom_resource(group : str, version : str, plural : str, namespace : str, name : str) -> (int, dict, str):
+    """
+    API to get a single namespaced custom resource by name
+
+    Parameters:
+        group: API group (e.g., 'resource.k8s.io')
+        version: API version (e.g., 'v1alpha3')
+        plural: Resource plural name (e.g., 'resourceclaims')
+        namespace: Namespace of the resource
+        name: Name of the resource
+
+    Returns:
+        tuple: (return_code, resource_dict, error_message)
+    """
+    global Logger
+    custom_objects_api = client.CustomObjectsApi()
+    try:
+        cr_info = custom_objects_api.get_namespaced_custom_object(
+            group = group,
+            version = version,
+            namespace = namespace,
+            plural = plural,
+            name = name
+        )
+        return 0, cr_info, None
+    except ApiException as e:
+        Logger.error(f"Failed to get {plural}/{name} in namespace {namespace}, error: {e}")
         return -1, None, str(e)
 
 def k8_get_servicemonitor_cr(namespace : str) -> (int, str, str):
