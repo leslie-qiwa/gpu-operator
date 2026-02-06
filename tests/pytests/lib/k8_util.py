@@ -87,6 +87,33 @@ def k8_init_cluster(k8_cluster : common.k8_cluster, namespaces):
     return
 
 @log_arguments
+def k8_get_version():
+    """
+    Get Kubernetes cluster version information
+    
+    Returns:
+        tuple: (ret_code, version_info_dict) where version_info_dict contains:
+            - major: major version
+            - minor: minor version
+            - git_version: full git version string
+    """
+    global Logger
+    
+    try:
+        version_api = client.VersionApi()
+        version_info = version_api.get_code()
+        
+        return 0, {
+            'major': version_info.major,
+            'minor': version_info.minor,
+            'git_version': version_info.git_version,
+            'platform': version_info.platform,
+        }
+    except Exception as e:
+        Logger.error(f"Failed to get Kubernetes version: {e}")
+        return 1, {}
+
+@log_arguments
 def k8_get_nodes() -> (int, str, K8Items):
     """
     API to get nodes from k8 cluster
@@ -579,7 +606,11 @@ def k8_delete_all_pods_with_name_pattern(namespace : str, pod_name_pattern: str)
         Logger.error(f"Failed to get all pods from namespace {namespace}, error: {e}")
         return -1
 
-    Logger.info(f"Deleting following pods from the cluster : {delete_list}")
+    if delete_list:
+        Logger.info(f"Deleting following pods from the cluster : {delete_list}")
+    else:
+        Logger.info(f"No pods matching pattern '{pod_name_pattern}' found in namespace {namespace}")
+    
     for pod_name in delete_list:
         ret_code, ret_stdout, ret_stderr = k8_delete_pod(pod_name, namespace, force = True)
         if ret_code != 0:

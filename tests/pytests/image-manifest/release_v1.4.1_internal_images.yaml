@@ -95,6 +95,17 @@ images:
             version     : 1.36
             kind        : container
 
+        dra-driver:
+            location    : repo://10.11.70.126:5000:k8s-gpu-dra-driver
+            version     : v0.1.0
+            kind        : helm-chart
+
+        dra-driver-image:
+            key         : image.repository
+            location    : container://<registry>/amd-gpu-dra-driver
+            version     : v0.1.0
+            kind        : container
+
     openshift:
         driver:
             key         : driver.image
