@@ -1,0 +1,7 @@
+apiVersion: v2
+appVersion: v0.1.0
+description: A Dynamic Resource Allocation (DRA) resource driver for AMD GPU
+kubeVersion: '>=1.32.0-0'
+name: k8s-gpu-dra-driver
+type: application
+version: v0.1.0

@@ -1,0 +1,61 @@
+{
+  "ID": "test-15821",
+  "Instances": [
+    {
+      "ID": 0,
+      "Name": "test-0-trace-15821",
+      "Type": "vm",
+      "NodeMgmtIP": "10.11.70.125",
+      "PvtNetworks": [
+        {
+          "Name": "control-1",
+          "VlanID": 562
+        },
+        {
+          "Name": "control-2",
+          "VlanID": 563
+        }
+      ]
+    },
+    {
+      "ID": 0,
+      "Name": "test-1-trace-15821",
+      "Type": "vm",
+      "NodeMgmtIP": "10.11.70.126",
+      "PvtNetworks": [
+        {
+          "Name": "control-1",
+          "VlanID": 562
+        },
+        {
+          "Name": "control-2",
+          "VlanID": 563
+        }
+      ]
+    },
+    {
+      "ID": 0,
+      "Name": "test-2-trace-15821",
+      "Type": "vm",
+      "NodeMgmtIP": "10.11.70.124",
+      "PvtNetworks": [
+        {
+          "Name": "control-1",
+          "VlanID": 562
+        },
+        {
+          "Name": "control-2",
+          "VlanID": 563
+        }
+      ]
+    }
+  ],
+  "Provision": {
+    "Username": "vm",
+    "Password": "vm",
+    "PrivateKeyFile": "",
+    "Vars": {
+      "DevSetup": "true"
+    }
+  }
+}

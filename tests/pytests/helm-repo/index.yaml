@@ -1,0 +1,15 @@
+apiVersion: v1
+entries:
+  k8s-gpu-dra-driver:
+  - apiVersion: v2
+    appVersion: v0.1.0
+    created: "2026-01-27T18:14:12.553076424Z"
+    description: A Dynamic Resource Allocation (DRA) resource driver for AMD GPU
+    digest: 69b1a3c94acfcb88cb6f68602748fb18a0eb2f5b7da7107aa827bb7af1c78b43
+    kubeVersion: '>=1.32.0-0'
+    name: k8s-gpu-dra-driver
+    type: application
+    urls:
+    - k8s-gpu-dra-driver-helm-k8s-v0.1.0.tgz
+    version: v0.1.0
+generated: "2026-01-27T18:14:12.552169965Z"

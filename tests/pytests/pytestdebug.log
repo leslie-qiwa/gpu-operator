@@ -1,0 +1,1410 @@
+versions pytest-9.0.2, python-3.10.12.final.0
+invocation_dir=/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+cwd=/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+args=('k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install', '--testbed=k8/dra-driver/cluster.yaml', '--image-manifest=k8/dra-driver/dra-images.yaml', '--deployment=k8', '--debug')
+
+  pytest_cmdline_main [hook]
+      config: <_pytest.config.Config object at 0x72c3cb91f910>
+    pytest_plugin_registered [hook]
+        plugin: <Session  exitstatus='<UNSET>' testsfailed=0 testscollected=0>
+        plugin_name: session
+        manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+    finish pytest_plugin_registered --> [] [hook]
+    pytest_configure [hook]
+        config: <_pytest.config.Config object at 0x72c3cb91f910>
+      pytest_metadata [hook]
+          metadata: {'Python': '3.10.12', 'Platform': 'Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.35', 'Packages': {'pytest': '9.0.2', 'pluggy': '1.6.0'}, 'Plugins': {'html': '4.2.0', 'metadata': '3.1.1'}}
+          config: <_pytest.config.Config object at 0x72c3cb91f910>
+      finish pytest_metadata --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x72c3c8887760>
+          plugin_name: lfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x72c3c88878e0>
+          plugin_name: nfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+    early skip of rewriting module: faulthandler [assertion]
+      pytest_plugin_registered [hook]
+          plugin: <class '_pytest.legacypath.LegacyTmpdirPlugin'>
+          plugin_name: legacypath-tmpdir
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+          plugin_name: 126185269918832
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.Config object at 0x72c3cb91f910>
+          plugin_name: pytestconfig
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.mark' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/mark/__init__.py'>
+          plugin_name: mark
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.main' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/main.py'>
+          plugin_name: main
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.runner' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/runner.py'>
+          plugin_name: runner
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.fixtures' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/fixtures.py'>
+          plugin_name: fixtures
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.helpconfig' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/helpconfig.py'>
+          plugin_name: helpconfig
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.python' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/python.py'>
+          plugin_name: python
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.terminal' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/terminal.py'>
+          plugin_name: terminal
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.debugging' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/debugging.py'>
+          plugin_name: debugging
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unittest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/unittest.py'>
+          plugin_name: unittest
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.capture' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/capture.py'>
+          plugin_name: capture
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.skipping' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/skipping.py'>
+          plugin_name: skipping
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.legacypath' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/legacypath.py'>
+          plugin_name: legacypath
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.tmpdir' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/tmpdir.py'>
+          plugin_name: tmpdir
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.monkeypatch' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/monkeypatch.py'>
+          plugin_name: monkeypatch
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.recwarn' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/recwarn.py'>
+          plugin_name: recwarn
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.pastebin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/pastebin.py'>
+          plugin_name: pastebin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.assertion' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/assertion/__init__.py'>
+          plugin_name: assertion
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.junitxml' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/junitxml.py'>
+          plugin_name: junitxml
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.doctest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/doctest.py'>
+          plugin_name: doctest
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.cacheprovider' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/cacheprovider.py'>
+          plugin_name: cacheprovider
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setuponly' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/setuponly.py'>
+          plugin_name: setuponly
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setupplan' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/setupplan.py'>
+          plugin_name: setupplan
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.stepwise' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/stepwise.py'>
+          plugin_name: stepwise
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unraisableexception' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/unraisableexception.py'>
+          plugin_name: unraisableexception
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.threadexception' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/threadexception.py'>
+          plugin_name: threadexception
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.warnings' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/warnings.py'>
+          plugin_name: warnings
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.logging' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/logging.py'>
+          plugin_name: logging
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.reports' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/reports.py'>
+          plugin_name: reports
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.faulthandler' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/faulthandler.py'>
+          plugin_name: faulthandler
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.subtests' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/subtests.py'>
+          plugin_name: subtests
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_html.plugin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/plugin.py'>
+          plugin_name: html
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_html.fixtures' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/fixtures.py'>
+          plugin_name: html_fixtures
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_metadata.plugin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_metadata/plugin.py'>
+          plugin_name: metadata
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <CaptureManager _method='fd' _global_capturing=<MultiCapture out=<FDCapture 1 oldfd=5 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=6 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> err=<FDCapture 2 oldfd=7 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=8 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> in_=<FDCapture 0 oldfd=3 _state='started' tmpfile=<_io.TextIOWrapper name='/dev/null' mode='r' encoding='utf-8'>> _state='suspended' _in_suspended=False> _capture_fixture=None>
+          plugin_name: capturemanager
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytests.conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          plugin_name: session
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x72c3c8887760>
+          plugin_name: lfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x72c3c88878e0>
+          plugin_name: nfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <class '_pytest.legacypath.LegacyTmpdirPlugin'>
+          plugin_name: legacypath-tmpdir
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.terminal.TerminalReporter object at 0x72c3c8886f80>
+          plugin_name: terminalreporter
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.logging.LoggingPlugin object at 0x72c3c8885a20>
+          plugin_name: logging-plugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+    finish pytest_configure --> [] [hook]
+    pytest_sessionstart [hook]
+        session: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+          plugin_name: 126185269918832
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.config.Config object at 0x72c3cb91f910>
+          plugin_name: pytestconfig
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.mark' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/mark/__init__.py'>
+          plugin_name: mark
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.main' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/main.py'>
+          plugin_name: main
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.runner' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/runner.py'>
+          plugin_name: runner
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.fixtures' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/fixtures.py'>
+          plugin_name: fixtures
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.helpconfig' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/helpconfig.py'>
+          plugin_name: helpconfig
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.python' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/python.py'>
+          plugin_name: python
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.terminal' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/terminal.py'>
+          plugin_name: terminal
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.debugging' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/debugging.py'>
+          plugin_name: debugging
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unittest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/unittest.py'>
+          plugin_name: unittest
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.capture' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/capture.py'>
+          plugin_name: capture
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.skipping' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/skipping.py'>
+          plugin_name: skipping
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.legacypath' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/legacypath.py'>
+          plugin_name: legacypath
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.tmpdir' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/tmpdir.py'>
+          plugin_name: tmpdir
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.monkeypatch' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/monkeypatch.py'>
+          plugin_name: monkeypatch
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.recwarn' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/recwarn.py'>
+          plugin_name: recwarn
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.pastebin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/pastebin.py'>
+          plugin_name: pastebin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.assertion' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/assertion/__init__.py'>
+          plugin_name: assertion
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.junitxml' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/junitxml.py'>
+          plugin_name: junitxml
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.doctest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/doctest.py'>
+          plugin_name: doctest
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.cacheprovider' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/cacheprovider.py'>
+          plugin_name: cacheprovider
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setuponly' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/setuponly.py'>
+          plugin_name: setuponly
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.setupplan' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/setupplan.py'>
+          plugin_name: setupplan
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.stepwise' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/stepwise.py'>
+          plugin_name: stepwise
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.unraisableexception' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/unraisableexception.py'>
+          plugin_name: unraisableexception
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.threadexception' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/threadexception.py'>
+          plugin_name: threadexception
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.warnings' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/warnings.py'>
+          plugin_name: warnings
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.logging' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/logging.py'>
+          plugin_name: logging
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.reports' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/reports.py'>
+          plugin_name: reports
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.faulthandler' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/faulthandler.py'>
+          plugin_name: faulthandler
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module '_pytest.subtests' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/subtests.py'>
+          plugin_name: subtests
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_html.plugin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/plugin.py'>
+          plugin_name: html
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_html.fixtures' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/fixtures.py'>
+          plugin_name: html_fixtures
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytest_metadata.plugin' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_metadata/plugin.py'>
+          plugin_name: metadata
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <CaptureManager _method='fd' _global_capturing=<MultiCapture out=<FDCapture 1 oldfd=5 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=6 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> err=<FDCapture 2 oldfd=7 _state='suspended' tmpfile=<_io.TextIOWrapper name="<_io.FileIO name=8 mode='rb+' closefd=True>" mode='r+' encoding='utf-8'>> in_=<FDCapture 0 oldfd=3 _state='started' tmpfile=<_io.TextIOWrapper name='/dev/null' mode='r' encoding='utf-8'>> _state='suspended' _in_suspended=False> _capture_fixture=None>
+          plugin_name: capturemanager
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'pytests.conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <module 'conftest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py'>
+          plugin_name: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          plugin_name: session
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.LFPlugin object at 0x72c3c8887760>
+          plugin_name: lfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.cacheprovider.NFPlugin object at 0x72c3c88878e0>
+          plugin_name: nfplugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <class '_pytest.legacypath.LegacyTmpdirPlugin'>
+          plugin_name: legacypath-tmpdir
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.terminal.TerminalReporter object at 0x72c3c8886f80>
+          plugin_name: terminalreporter
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.logging.LoggingPlugin object at 0x72c3c8885a20>
+          plugin_name: logging-plugin
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_plugin_registered [hook]
+          plugin: <_pytest.fixtures.FixtureManager object at 0x72c3c88869e0>
+          plugin_name: funcmanage
+          manager: <_pytest.config.PytestPluginManager object at 0x72c3cc307c70>
+      finish pytest_plugin_registered --> [] [hook]
+      pytest_report_header [hook]
+          config: <_pytest.config.Config object at 0x72c3cb91f910>
+          start_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+          startdir: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+      finish pytest_report_header --> [['rootdir: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests', 'configfile: pytest.ini', 'plugins: html-4.2.0, metadata-3.1.1'], ['using: pytest-9.0.2', 'registered third-party plugins:', '  pytest-html-4.2.0 at /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/plugin.py', '  pytest-html-4.2.0 at /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_html/fixtures.py', '  pytest-metadata-3.1.1 at /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest_metadata/plugin.py']] [hook]
+    finish pytest_sessionstart --> [] [hook]
+    pytest_collection [hook]
+        session: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+    perform_collect <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0> ['k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install'] [collection]
+        pytest_collectstart [hook]
+            collector: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+        finish pytest_collectstart --> [] [hook]
+        pytest_make_collect_report [hook]
+            collector: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+        processing argument CollectionArgument(path=PosixPath('/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py'), parts=['test_dra_driver_install'], parametrization=None, module_name=None, original_index=0) [collection]
+            pytest_collect_directory [hook]
+                path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+                parent: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+            finish pytest_collect_directory --> <Package pytests> [hook]
+            pytest_collectstart [hook]
+                collector: <Package pytests>
+            finish pytest_collectstart --> [] [hook]
+            pytest_make_collect_report [hook]
+                collector: <Package pytests>
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__init__.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__init__.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__init__.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__init__.py
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.gitignore
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.gitignore
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.gitignore
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.gitignore
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.pytest_cache
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/.pytest_cache
+              finish pytest_ignore_collect --> True [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/DRA_TEST_IMPLEMENTATION.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/DRA_TEST_IMPLEMENTATION.md
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/DRA_TEST_IMPLEMENTATION.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/DRA_TEST_IMPLEMENTATION.md
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/README.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/README.md
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/README.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/README.md
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__pycache__
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/__pycache__
+              finish pytest_ignore_collect --> True [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/bin
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/bin
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/bin
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir bin> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/conftest.py
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/downloads
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/downloads
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/downloads
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir downloads> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/helm-repo
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/helm-repo
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/helm-repo
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir helm-repo> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/image-manifest
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/image-manifest
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/image-manifest
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir image-manifest> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/include
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/include
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/include
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir include> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/install_from_manifest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/install_from_manifest.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/install_from_manifest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/install_from_manifest.py
+              finish pytest_collect_file --> [] [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir k8> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8_test_launcher.sh
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8_test_launcher.sh
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/kube_config
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/kube_config
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/kube_config
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/kube_config
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir lib> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib64
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib64
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib64
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir lib64> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/logs
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/logs
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/logs
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir logs> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/oc_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/oc_test_launcher.sh
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/oc_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/oc_test_launcher.sh
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/openshift
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/openshift
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/openshift
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir openshift> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytest.ini
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytest.ini
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytest.ini
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytest.ini
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytestdebug.log
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytestdebug.log
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytestdebug.log
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pytestdebug.log
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pyvenv.cfg
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pyvenv.cfg
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pyvenv.cfg
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/pyvenv.cfg
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/requirements.txt
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/requirements.txt
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/requirements.txt
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/requirements.txt
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/run_install.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/run_install.sh
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/run_install.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/run_install.sh
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/scripts
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/scripts
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/scripts
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir scripts> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone
+                  parent: <Package pytests>
+              finish pytest_collect_directory --> <Dir standalone> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone_test_launcher.sh
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone_test_launcher.sh
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/standalone_test_launcher.sh
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/testcases.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/testcases.md
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Package pytests>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/testcases.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/testcases.md
+              finish pytest_collect_file --> [] [hook]
+            finish pytest_make_collect_report --> <CollectReport '.' lenresult=12 outcome='passed'> [hook]
+            pytest_collectstart [hook]
+                collector: <Dir k8>
+            finish pytest_collectstart --> [] [hook]
+            pytest_make_collect_report [hook]
+                collector: <Dir k8>
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/__pycache__
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/__pycache__
+              finish pytest_ignore_collect --> True [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir k8>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/conftest.py
+              finish pytest_collect_file --> [] [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver
+                  parent: <Dir k8>
+              finish pytest_collect_directory --> <Dir dra-driver> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/exporter
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/exporter
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/exporter
+                  parent: <Dir k8>
+              finish pytest_collect_directory --> <Dir exporter> [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/gpu-operator
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/gpu-operator
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_directory [hook]
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/gpu-operator
+                  parent: <Dir k8>
+              finish pytest_collect_directory --> <Dir gpu-operator> [hook]
+            finish pytest_make_collect_report --> <CollectReport 'k8' lenresult=3 outcome='passed'> [hook]
+            pytest_collectstart [hook]
+                collector: <Dir dra-driver>
+            finish pytest_collectstart --> [] [hook]
+            pytest_make_collect_report [hook]
+                collector: <Dir dra-driver>
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/README.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/README.md
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/README.md
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/README.md
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/__pycache__
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/__pycache__
+              finish pytest_ignore_collect --> True [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/cluster.yaml
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/cluster.yaml
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/cluster.yaml
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/cluster.yaml
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/conftest.py
+              finish pytest_collect_file --> [] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/dra-images.yaml
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/dra-images.yaml
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/dra-images.yaml
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/dra-images.yaml
+              finish pytest_collect_file --> [] [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py
+                pytest_pycollect_makemodule [hook]
+                    parent: <Dir dra-driver>
+                    module_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py
+                    path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py
+                finish pytest_pycollect_makemodule --> <Module test_dra_driver_install.py> [hook]
+              finish pytest_collect_file --> [<Module test_dra_driver_install.py>] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+                pytest_pycollect_makemodule [hook]
+                    parent: <Dir dra-driver>
+                    module_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+                    path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_resource_allocation.py
+                finish pytest_pycollect_makemodule --> <Module test_dra_resource_allocation.py> [hook]
+              finish pytest_collect_file --> [<Module test_dra_resource_allocation.py>] [hook]
+              pytest_ignore_collect [hook]
+                  config: <_pytest.config.Config object at 0x72c3cb91f910>
+                  collection_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+              finish pytest_ignore_collect --> None [hook]
+              pytest_collect_file [hook]
+                  parent: <Dir dra-driver>
+                  file_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+                  path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+                pytest_pycollect_makemodule [hook]
+                    parent: <Dir dra-driver>
+                    module_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+                    path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_workloads.py
+                finish pytest_pycollect_makemodule --> <Module test_dra_workloads.py> [hook]
+              finish pytest_collect_file --> [<Module test_dra_workloads.py>] [hook]
+            finish pytest_make_collect_report --> <CollectReport 'k8/dra-driver' lenresult=3 outcome='passed'> [hook]
+            pytest_collectstart [hook]
+                collector: <Module test_dra_driver_install.py>
+            finish pytest_collectstart --> [] [hook]
+            pytest_make_collect_report [hook]
+                collector: <Module test_dra_driver_install.py>
+            find_module called for: test_dra_driver_install [assertion]
+            matched test file (was specified on cmdline): '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py' [assertion]
+            _read_pyc(/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py): out of date [assertion]
+            rewriting PosixPath('/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/k8/dra-driver/test_dra_driver_install.py') [assertion]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: @py_builtins
+                  obj: <module 'builtins' (built-in)>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: @pytest_ar
+                  obj: <module '_pytest.assertion.rewrite' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/_pytest/assertion/rewrite.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: pdb
+                  obj: <module 'pdb' from '/usr/lib/python3.10/pdb.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: pytest
+                  obj: <module 'pytest' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/python3.10/site-packages/pytest/__init__.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: pprint
+                  obj: <module 'pprint' from '/usr/lib/python3.10/pprint.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: sys
+                  obj: <module 'sys' (built-in)>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: os
+                  obj: <module 'os' from '/usr/lib/python3.10/os.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: time
+                  obj: <module 'time' (built-in)>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: json
+                  obj: <module 'json' from '/usr/lib/python3.10/json/__init__.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: logging
+                  obj: <module 'logging' from '/usr/lib/python3.10/logging/__init__.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: helm_util
+                  obj: <module 'lib.helm_util' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/helm_util.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: k8_util
+                  obj: <module 'lib.k8_util' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/k8_util.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: dra_util
+                  obj: <module 'lib.dra_util' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/dra_util.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: common
+                  obj: <module 'lib.common' from '/home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests/lib/common.py'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: K8Helper
+                  obj: <class 'lib.util.K8Helper'>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: Logger
+                  obj: <Logger k8.test_dra_driver_install (DEBUG)>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: skip_module
+                  obj: <pytest_fixture(<function skip_module at 0x72c3c889cdc0>)>
+              finish pytest_pycollect_makeitem --> None [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_install
+                  obj: <function test_dra_driver_install at 0x72c3c889cd30>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_install>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_check_pods
+                  obj: <function test_dra_driver_check_pods at 0x72c3c889d2d0>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_check_pods>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_check_crds
+                  obj: <function test_dra_driver_check_crds at 0x72c3c889d240>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_check_crds>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_check_resource_class
+                  obj: <function test_dra_driver_check_resource_class at 0x72c3c889d360>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_check_resource_class>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_logs_no_errors
+                  obj: <function test_dra_driver_logs_no_errors at 0x72c3c889d3f0>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_logs_no_errors>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_gpu_node_labels
+                  obj: <function test_dra_driver_gpu_node_labels at 0x72c3c889d480>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_gpu_node_labels>] [hook]
+              pytest_pycollect_makeitem [hook]
+                  collector: <Module test_dra_driver_install.py>
+                  name: test_dra_driver_uninstall
+                  obj: <function test_dra_driver_uninstall at 0x72c3c889d510>
+                pytest_generate_tests [hook]
+                    metafunc: <_pytest.python.Metafunc object at 0x72c3c88cfe20>
+                finish pytest_generate_tests --> [] [hook]
+              finish pytest_pycollect_makeitem --> [<Function test_dra_driver_uninstall>] [hook]
+            finish pytest_make_collect_report --> <CollectReport 'k8/dra-driver/test_dra_driver_install.py' lenresult=7 outcome='passed'> [hook]
+        finish pytest_make_collect_report --> <CollectReport '' lenresult=1 outcome='passed'> [hook]
+        pytest_collectreport [hook]
+            report: <CollectReport '' lenresult=1 outcome='passed'>
+        finish pytest_collectreport --> [] [hook]
+    genitems <Function test_dra_driver_install> [collection]
+      pytest_itemcollected [hook]
+          item: <Function test_dra_driver_install>
+      finish pytest_itemcollected --> [] [hook]
+      pytest_collection_modifyitems [hook]
+          session: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+          config: <_pytest.config.Config object at 0x72c3cb91f910>
+          items: [<Function test_dra_driver_install>]
+      finish pytest_collection_modifyitems --> [] [hook]
+      pytest_collection_finish [hook]
+          session: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=0>
+        pytest_report_collectionfinish [hook]
+            config: <_pytest.config.Config object at 0x72c3cb91f910>
+            items: [<Function test_dra_driver_install>]
+            start_path: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+            startdir: /home/qiwa/workspace/golang/src/github.com/pensando/gpu-operator-pensando/tests/pytests
+        finish pytest_report_collectionfinish --> [] [hook]
+      finish pytest_collection_finish --> [] [hook]
+    finish pytest_collection --> None [hook]
+    pytest_runtestloop [hook]
+        session: <Session  exitstatus=<ExitCode.OK: 0> testsfailed=0 testscollected=1>
+      pytest_runtest_protocol [hook]
+          item: <Function test_dra_driver_install>
+          nextitem: None
+        pytest_runtest_logstart [hook]
+            nodeid: k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install
+            location: ('k8/dra-driver/test_dra_driver_install.py', 45, 'test_dra_driver_install')
+        finish pytest_runtest_logstart --> [] [hook]
+        pytest_runtest_setup [hook]
+            item: <Function test_dra_driver_install>
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='environment' scope='session' baseid=''>
+              request: <SubRequest 'environment' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> <pytests.conftest.environment.<locals>.Env object at 0x72c3c88cd120> [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='gpu_cluster' scope='session' baseid=''>
+              request: <SubRequest 'gpu_cluster' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> <lib.common.k8_cluster object at 0x72c3cafdc9a0> [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='images' scope='session' baseid=''>
+              request: <SubRequest 'images' for <Function test_dra_driver_install>>
+          early skip of rewriting module: ruamel.yaml.mergevalue [assertion]
+          finish pytest_fixture_setup --> [hook]
+              image_folder: downloads
+              driver.image.repository: registry.test.pensando.io:5000/amdgpu_kmod
+              gpu-operator.repo-name: gpu-operator-repo
+              gpu-operator.repo: https://rocm.github.io/gpu-operator
+              gpu-operator.repository: https://rocm.github.io/gpu-operator
+              gpu-operator.helm-chart: gpu-operator-repo/gpu-operator-charts
+              controllerManager.manager.image.repository: docker.io/rocm/gpu-operator
+              controllerManager.manager.image.version: v1.4.1
+              exporter.repo-name: exporter-repo
+              exporter.repo: https://rocm.github.io/device-metrics-exporter
+              exporter.repository: https://rocm.github.io/device-metrics-exporter
+              exporter.helm-chart: exporter-repo/device-metrics-exporter-charts
+              metricsExporter.image.repository: docker.io/rocm/device-metrics-exporter
+              metricsExporter.image.version: v1.4.1
+              testRunner.image.repository: docker.io/rocm/test-runner
+              testRunner.image.version: v1.4.1
+              testRunnerAgfhc.image.repository: docker.io/rocm/test-runner
+              testRunnerAgfhc.image.version: agfhc-v1.4.1
+              configManager.image.repository: docker.io/rocm/device-config-manager
+              configManager.image.version: v1.4.1
+              devicePlugin.devicePluginImage.repository: docker.io/rocm/k8s-device-plugin
+              devicePlugin.devicePluginImage.version: latest
+              devicePlugin.nodeLabellerImage.repository: docker.io/rocm/k8s-device-plugin
+              devicePlugin.nodeLabellerImage.version: labeller-latest
+              kmm.controller.manager.env.relatedImageSign.repository: docker.io/rocm/kernel-module-management-signimage
+              kmm.controller.manager.env.relatedImageSign.version: v1.4.1
+              kmm.controller.manager.env.relatedImageWorker.repository: docker.io/rocm/kernel-module-management-worker
+              kmm.controller.manager.env.relatedImageWorker.version: v1.4.1
+              kmm.controller.manager.image.repository: docker.io/rocm/kernel-module-management-operator
+              kmm.controller.manager.image.version: v1.4.1
+              kmm.webhookServer.webhookServer.image.repository: docker.io/rocm/kernel-module-management-webhook-server
+              kmm.webhookServer.webhookServer.image.version: v1.4.1
+              commonConfig.initContainerImage.repository: registry.test.pensando.io:5000/busybox
+              commonConfig.initContainerImage.version: 1.36
+              dra-driver.helm-chart: downloads/k8s-gpu-dra-driver-helm-k8s-v0.1.0.tgz
+              image.repository.repository: docker.io/rocm/k8s-gpu-dra-driver
+              image.repository.version: v0.1.0-alpha.0
+              driver.imageBuild.baseImageRegistry: docker.io
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='gather_device_info' scope='session' baseid=''>
+              request: <SubRequest 'gather_device_info' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> None [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='gpu_operator_release_name' scope='session' baseid='k8'>
+              request: <SubRequest 'gpu_operator_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> gpu-operator [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='exporter_release_name' scope='session' baseid='k8'>
+              request: <SubRequest 'exporter_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> device-metrics-exporter [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> None [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='dra_driver_release_name' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> amd-gpu-dra-driver [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='dra_driver_namespace' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_namespace' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> kube-amd-gpu-dra [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> None [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='skip_module' scope='module' baseid='k8/dra-driver/test_dra_driver_install.py'>
+              request: <SubRequest 'skip_module' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> None [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> v0.1.0 [hook]
+          pytest_fixture_setup [hook]
+              fixturedef: <FixtureDef argname='update_environment' scope='function' baseid=''>
+              request: <SubRequest 'update_environment' for <Function test_dra_driver_install>>
+          finish pytest_fixture_setup --> None [hook]
+        finish pytest_runtest_setup --> None [hook]
+        pytest_runtest_makereport [hook]
+            item: <Function test_dra_driver_install>
+            call: <CallInfo when='setup' result: None>
+        finish pytest_runtest_makereport --> <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='setup' outcome='passed'> [hook]
+        pytest_runtest_logreport [hook]
+            report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='setup' outcome='passed'>
+          pytest_report_teststatus [hook]
+              report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='setup' outcome='passed'>
+              config: <_pytest.config.Config object at 0x72c3cb91f910>
+          finish pytest_report_teststatus --> ('', '', '') [hook]
+        finish pytest_runtest_logreport --> [] [hook]
+        pytest_runtest_call [hook]
+            item: <Function test_dra_driver_install>
+          pytest_pyfunc_call [hook]
+              pyfuncitem: <Function test_dra_driver_install>
+          finish pytest_pyfunc_call --> True [hook]
+        finish pytest_runtest_call --> None [hook]
+        pytest_runtest_makereport [hook]
+            item: <Function test_dra_driver_install>
+            call: <CallInfo when='call' result: None>
+        finish pytest_runtest_makereport --> <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='call' outcome='passed'> [hook]
+        pytest_runtest_logreport [hook]
+            report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='call' outcome='passed'>
+          pytest_report_teststatus [hook]
+              report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='call' outcome='passed'>
+              config: <_pytest.config.Config object at 0x72c3cb91f910>
+          finish pytest_report_teststatus --> ('passed', '.', 'PASSED') [hook]
+        finish pytest_runtest_logreport --> [] [hook]
+        pytest_runtest_teardown [hook]
+            item: <Function test_dra_driver_install>
+            nextitem: None
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='update_environment' scope='function' baseid=''>
+              request: <SubRequest 'update_environment' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='skip_module' scope='module' baseid='k8/dra-driver/test_dra_driver_install.py'>
+              request: <SubRequest 'skip_module' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_namespace' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_namespace' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_release_name' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='exporter_release_name' scope='session' baseid='k8'>
+              request: <SubRequest 'exporter_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gpu_operator_release_name' scope='session' baseid='k8'>
+              request: <SubRequest 'gpu_operator_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gather_device_info' scope='session' baseid=''>
+              request: <SubRequest 'gather_device_info' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gather_device_info' scope='session' baseid=''>
+              request: <SubRequest 'gather_device_info' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='images' scope='session' baseid=''>
+              request: <SubRequest 'images' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gather_device_info' scope='session' baseid=''>
+              request: <SubRequest 'gather_device_info' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='images' scope='session' baseid=''>
+              request: <SubRequest 'images' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gpu_cluster' scope='session' baseid=''>
+              request: <SubRequest 'gpu_cluster' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='update_environment' scope='function' baseid=''>
+              request: <SubRequest 'update_environment' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_install' scope='module' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_install' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='skip_module' scope='module' baseid='k8/dra-driver/test_dra_driver_install.py'>
+              request: <SubRequest 'skip_module' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_dra_testbed' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'init_dra_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_namespace' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_namespace' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='dra_driver_release_name' scope='session' baseid='k8/dra-driver'>
+              request: <SubRequest 'dra_driver_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='init_testbed' scope='session' baseid='k8'>
+              request: <SubRequest 'init_testbed' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gpu_operator_release_name' scope='session' baseid='k8'>
+              request: <SubRequest 'gpu_operator_release_name' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gather_device_info' scope='session' baseid=''>
+              request: <SubRequest 'gather_device_info' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='images' scope='session' baseid=''>
+              request: <SubRequest 'images' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='gpu_cluster' scope='session' baseid=''>
+              request: <SubRequest 'gpu_cluster' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+          pytest_fixture_post_finalizer [hook]
+              fixturedef: <FixtureDef argname='environment' scope='session' baseid=''>
+              request: <SubRequest 'environment' for <Function test_dra_driver_install>>
+          finish pytest_fixture_post_finalizer --> [] [hook]
+        finish pytest_runtest_teardown --> None [hook]
+        pytest_runtest_makereport [hook]
+            item: <Function test_dra_driver_install>
+            call: <CallInfo when='teardown' result: None>
+        finish pytest_runtest_makereport --> <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='teardown' outcome='passed'> [hook]
+        pytest_runtest_logreport [hook]
+            report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='teardown' outcome='passed'>
+          pytest_report_teststatus [hook]
+              report: <TestReport 'k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install' when='teardown' outcome='passed'>
+              config: <_pytest.config.Config object at 0x72c3cb91f910>
+          finish pytest_report_teststatus --> ('', '', '') [hook]
+        finish pytest_runtest_logreport --> [] [hook]
+        pytest_runtest_logfinish [hook]
+            nodeid: k8/dra-driver/test_dra_driver_install.py::test_dra_driver_install
+            location: ('k8/dra-driver/test_dra_driver_install.py', 45, 'test_dra_driver_install')
+        finish pytest_runtest_logfinish --> [] [hook]
+      finish pytest_runtest_protocol --> True [hook]
+    finish pytest_runtestloop --> True [hook]
+    pytest_sessionfinish [hook]
+        session: <Session  exitstatus=0 testsfailed=0 testscollected=1>
+        exitstatus: 0
+      pytest_terminal_summary [hook]
+          terminalreporter: <_pytest.terminal.TerminalReporter object at 0x72c3c8886f80>
+          exitstatus: 0
+          config: <_pytest.config.Config object at 0x72c3cb91f910>
+      finish pytest_terminal_summary --> [] [hook]
+    finish pytest_sessionfinish --> [] [hook]
+    pytest_unconfigure [hook]
+        config: <_pytest.config.Config object at 0x72c3cb91f910>
+    finish pytest_unconfigure --> [] [hook]

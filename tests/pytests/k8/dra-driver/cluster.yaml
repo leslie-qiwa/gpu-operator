@@ -1,0 +1,10 @@
+{
+  "cluster_name": "my-k8s-cluster",
+  "nodes": [
+    {
+      "ip": "gbt350-odcdh2-a06-1.png-odc.dcgpu",
+      "hostname": "gbt350-odcdh2-a06-1",
+      "role": "controller"
+    }
+  ]
+}
