@@ -28,7 +28,11 @@ from collections import defaultdict
 Logger = logging.getLogger("lib.amdgpu")
 
 def get_matching_driver_version(rocm_version):
-    with open("lib/files/gpu-operator-rocm-info.json", "r") as fp:
+    # Use absolute path relative to this module
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    json_file = os.path.join(module_dir, "files", "gpu-operator-rocm-info.json")
+
+    with open(json_file, "r") as fp:
         rocm_info = json.load(fp)
 
     for entry in rocm_info['rocm-driver-matrix']:
@@ -40,7 +44,11 @@ def get_amdgpu_device_series(device_id) -> str:
     """
     Lookup device-id in the amdgpu-features.json to retrieve GPU Series Name
     """
-    with open("lib/files/amdgpu-features.json", "r") as fp:
+    # Use absolute path relative to this module
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    json_file = os.path.join(module_dir, "files", "amdgpu-features.json")
+
+    with open(json_file, "r") as fp:
         amdgpu_feature_data = json.load(fp)
 
     dev_id_str = str(device_id).strip()

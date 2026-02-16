@@ -444,45 +444,12 @@ def _build_image_info(environment, image_manifest):
 
 @pytest.fixture(scope="session", autouse=True)
 def gather_device_info(gpu_cluster, images, environment):
-    # Derive gpu information using amd-smi information
-    ret_code, k8_nodes = k8_util.k8_get_nodes()
-    if ret_code != 0:
-        pytest.exit(f"Unable to collect node information from k8-cluster - Abort")
-    if len(k8_nodes) == 0:
-        pytest.exit(f"Unable to collect node information from k8-cluster - Abort")
+    # Derive gpu information using shared node_gpu_collector helper
+    import lib.node_gpu_collector as node_collector
 
-    """
-    root@worker-node:~# lspci  -nn -d 1002:
-        82:00.0 PCI bridge [0604]: Advanced Micro Devices, Inc. [AMD/ATI] Device [1002:1501]
-        83:00.0 Processing accelerators [1200]: Advanced Micro Devices, Inc. [AMD/ATI] Aqua Vanjaram [Instinct MI300X] [1002:74a1]
-    """
-    pattern = r"(?:Processing accelerators|Display controller).*1002:([0-9a-fA-F]{4})"
-    for node in k8_nodes:
-        node_name = k8_util.k8_get_node_hostname(node)
-        node_ip = k8_util.k8_get_node_address(node)
-        os_type, os_name, os_version = k8_util.k8_get_node_os_info(node)
-        cluster_node = gpu_cluster.find_node_by_ip(node_ip)
-        cluster_node.host_name = node_name
-        cluster_node.host_os_type = os_type
-        cluster_node.host_os_name = os_name
-        cluster_node.host_os_version = os_version
-        cmd = ["lspci", "-nn", "-d", "1002:"]
-        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
-        if ret_code != 0:
-            pytest.exit(f"Unable to run command on node via debug-pod, Abort")
-        if not resp_stdout:
-            Logger.debug(f"Node: {node_name} does not have any amdgpu devices")
-            continue
-        # Parse
-        gpu_count = 0
-        for line in resp_stdout.split("\n"):
-            if line:
-                match = re.search(pattern, line)
-                if match:
-                    cluster_node.device_id = match.group(1)
-                    gpu_count += 1
-        cluster_node.num_gpus = gpu_count
-        cluster_node.gpu_series = amdgpu_util.get_amdgpu_device_series(cluster_node.device_id)
+    success, error_msg = node_collector.populate_all_cluster_nodes_with_gpu_info(gpu_cluster)
+    if not success:
+        pytest.exit(f"Failed to collect node GPU information: {error_msg}")
 
     Logger.info("Collected amd-gpu information for all cluster nodes")
 
