@@ -298,5 +298,32 @@ e2e-targets:
         count: 1
         name: AMD-GPU-MI210
 
+  gpu-operator-regression-mi350-openshift:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_sanity.sh --deployment openshift --app gpu-operator \
+         --type sanity --registry local --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-config-manager
+      - gpu-operator-olm-bundle-sanity-build
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: testbed-type
+            value: OpenShift
+
 logfiles:
   - /gpu-operator/tests/pytests/pytest_logs.tgz
