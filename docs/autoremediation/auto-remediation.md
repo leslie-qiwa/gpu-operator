@@ -86,9 +86,9 @@ The GPU Operator installs Argo Workflows v3.6.5, using a [customized installatio
 
 ## Installation - OpenShift
 
-For OpenShift users: To use the auto remediation feature, additonal steps are required to install Argo Workflows to the OpenShift cluster, which requires special consideration:
+For OpenShift users: To use the auto remediation feature, additional steps are required to install Argo Workflows to the OpenShift cluster, which requires special consideration:
 
-  1. **If using OpenShift AI Operator with CRD `DataScienceCluster`:** Argo Workflows are possibly already deployed by the OpenShift AI Operator, if the CustomResrouceDefinition like workflows.argoproj.io is already existing, no additional installation is needed.
+  1. **If using OpenShift AI Operator with CRD `DataScienceCluster`:** Argo Workflows are possibly already deployed by the OpenShift AI Operator, if the CustomResourceDefinition like workflows.argoproj.io is already existing, no additional installation is needed.
 
   2. **If not using OpenShift AI Operator:** Follow these steps to install Argo Workflows on your OpenShift cluster:
 
