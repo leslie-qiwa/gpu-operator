@@ -446,7 +446,7 @@ def k8_get_namespaced_custom_resource(group : str, version : str, plural : str, 
 
     Parameters:
         group: API group (e.g., 'resource.k8s.io')
-        version: API version (e.g., 'v1alpha3')
+        version: API version (e.g., 'v1' or 'v1beta1')
         plural: Resource plural name (e.g., 'resourceclaims')
         namespace: Namespace of the resource
         name: Name of the resource

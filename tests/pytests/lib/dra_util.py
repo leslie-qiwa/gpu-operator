@@ -34,53 +34,269 @@ import lib.k8_util as k8_util
 
 Logger = logging.getLogger("lib.dra_util")
 
-# DRA API Group and Version
+# DRA API Group
 DRA_API_GROUP = "resource.k8s.io"
-DRA_API_VERSION = "v1alpha3"  # Will need to adjust based on K8s version
+
+# We only support structured API: v1beta1 (K8s 1.32-1.33) or v1 (K8s 1.34+)
+# The older opaque API (v1alpha2, v1alpha3) is not supported
+# API version is determined dynamically at runtime via check_dra_api_available()
 
 
-def get_dra_api_version() -> str:
+def check_feature_gate_enabled(
+    component_names: List[str],
+) -> Tuple[bool, Dict[str, bool], str]:
     """
-    Determine the DRA API version available in the cluster
-    
-    Equivalent kubectl command (K8s 1.26-1.33 with CRDs):
-        kubectl get crd resourceclaims.resource.k8s.io -o jsonpath='{.spec.versions[?(@.storage==true)].name}'
-    
-    For K8s 1.34+ (built-in resources, no CRDs):
-        kubectl api-resources | grep resourceclaims
-        # Or check API version:
-        kubectl get --raw /apis/resource.k8s.io | jq -r '.versions[].version'
-    
-    Returns: API version string (v1alpha3, v1beta1, v1, etc.)
+    Check if DynamicResourceAllocation feature gate is enabled on Kubernetes components.
+
+    This checks the command-line arguments of control plane components to verify
+    that --feature-gates=DynamicResourceAllocation=true is set.
+
+    Equivalent kubectl commands:
+        kubectl get pod kube-apiserver-<node> -n kube-system -o yaml
+        kubectl get pod kube-scheduler-<node> -n kube-system -o yaml
+        kubectl get pod kube-controller-manager-<node> -n kube-system -o yaml
+
+    Args:
+        component_names: List of component names to check (e.g., ['kube-apiserver', 'kube-scheduler'])
+
+    Returns:
+        Tuple of (all_enabled, status_dict, error_message):
+            - all_enabled: True if feature gate is enabled on all components
+            - status_dict: Dict mapping component name to enabled status
+            - error_message: Error message if any component is missing the feature gate
     """
     global Logger
-    
-    # First try to get version from CRD (K8s < 1.34)
-    api = client.ApiextensionsV1Api()
+
+    status = {}
+    errors = []
+
     try:
-        crd = api.read_custom_resource_definition("resourceclaims.resource.k8s.io")
-        for version in crd.spec.versions:
-            if version.served and version.storage:
-                Logger.info(f"Using DRA API version from CRD: {version.name}")
-                return version.name
+        v1 = client.CoreV1Api()
+
+        # Get all pods in kube-system namespace
+        pods = v1.list_namespaced_pod(namespace="kube-system")
+
+        for component in component_names:
+            found = False
+            enabled = False
+
+            # Find pods matching the component name
+            for pod in pods.items:
+                if pod.metadata.name.startswith(component):
+                    found = True
+
+                    # Check command-line arguments
+                    if pod.spec.containers:
+                        container = pod.spec.containers[0]
+                        command_args = container.command or []
+                        command_args.extend(container.args or [])
+
+                        # Look for --feature-gates argument
+                        for arg in command_args:
+                            if arg.startswith("--feature-gates="):
+                                feature_gates_str = arg.split("=", 1)[1]
+                                # Parse feature gates (format: "Gate1=true,Gate2=false,...")
+                                feature_gates = {}
+                                for gate in feature_gates_str.split(","):
+                                    if "=" in gate:
+                                        gate_name, gate_value = gate.split("=", 1)
+                                        feature_gates[gate_name.strip()] = (
+                                            gate_value.strip().lower() == "true"
+                                        )
+
+                                # Check if DynamicResourceAllocation is enabled
+                                if feature_gates.get(
+                                    "DynamicResourceAllocation", False
+                                ):
+                                    enabled = True
+                                    Logger.info(
+                                        f"Feature gate DynamicResourceAllocation is enabled on {component}"
+                                    )
+                                else:
+                                    Logger.warning(
+                                        f"Feature gate DynamicResourceAllocation not found or disabled on {component}"
+                                    )
+                                break
+                    break
+
+            if not found:
+                Logger.warning(
+                    f"Could not find {component} pod in kube-system namespace"
+                )
+                errors.append(f"{component} pod not found")
+            elif not enabled:
+                errors.append(
+                    f"{component} missing --feature-gates=DynamicResourceAllocation=true"
+                )
+
+            status[component] = enabled
+
+        all_enabled = all(status.values())
+        error_msg = "; ".join(errors) if errors else ""
+
+        return all_enabled, status, error_msg
+
     except ApiException as e:
-        Logger.debug(f"Failed to get DRA API version from CRD: {e}")
-    
-    # CRD not found - try built-in API (K8s >= 1.34)
-    # Check if ResourceClaim is available as built-in resource
-    # Use existing k8_util helper
-    ret_code, items, err = k8_util.k8_get_custom_resource_objects(
-        group=DRA_API_GROUP,
-        version="v1",
-        plural="resourceclaims"
-    )
-    if ret_code == 0:
-        Logger.info(f"Using DRA API version (built-in): v1")
-        return "v1"
-    
-    # Fallback to v1alpha3 for older versions
-    Logger.warn(f"Could not determine DRA API version, defaulting to v1alpha3")
-    return "v1alpha3"
+        error_msg = f"Failed to check feature gates: {e}"
+        Logger.error(error_msg)
+        return False, {}, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error checking feature gates: {e}"
+        Logger.error(error_msg)
+        return False, {}, error_msg
+
+
+def check_dra_api_available() -> Tuple[bool, str, str]:
+    """
+    Check if DRA structured API is available in the cluster and return the version.
+
+    We only support the newer "structured API" DRA which went beta in K8s 1.32
+    and GA in K8s 1.34. The older "opaque API" is not supported.
+
+    This function queries the Kubernetes API server directly to determine which
+    DRA API version is available, preferring v1 (GA) over v1beta1 (beta).
+
+    Equivalent kubectl commands:
+        # Check available API versions
+        kubectl api-versions | grep resource.k8s.io
+
+        # List API resources for the group
+        kubectl api-resources --api-group=resource.k8s.io
+
+        # List DeviceClasses to validate
+        kubectl get deviceclasses.resource.k8s.io
+
+    Returns:
+        tuple: (bool, str, str) - (success, error_message, api_version)
+            - success: True if DRA API is available, False otherwise
+            - error_message: Error message if not available, empty string otherwise
+            - api_version: DRA API version (v1beta1 or v1), empty string if not available
+    """
+    global Logger
+
+    try:
+        # Query available API groups and versions from the cluster
+        # This is more robust than inferring from K8s version
+        api_client = client.ApiClient()
+        apis_api = client.ApisApi(api_client)
+        api_groups = apis_api.get_api_versions()
+
+        # Look for resource.k8s.io group and check available versions
+        dra_versions = []
+        for group in api_groups.groups:
+            if group.name == DRA_API_GROUP:
+                dra_versions = [v.version for v in group.versions]
+                Logger.info(
+                    f"Found DRA API group '{DRA_API_GROUP}' with versions: {dra_versions}"
+                )
+                break
+
+        if not dra_versions:
+            # Get K8s version to provide helpful error message
+            ret_code, version_info = k8_util.k8_get_version()
+            if ret_code == 0:
+                major = version_info.get("major", "?")
+                minor = version_info.get("minor", "?")
+                error_msg = f"DRA API group '{DRA_API_GROUP}' not found in cluster (K8s {major}.{minor}). "
+
+                # Provide version-specific guidance
+                try:
+                    if int(str(minor)) >= 32 and int(str(minor)) <= 33:
+                        error_msg += "For K8s 1.32-1.33, ensure DynamicResourceAllocation feature gate is enabled on all components (kube-apiserver, kube-controller-manager, kube-scheduler, kubelet) with --feature-gates=DynamicResourceAllocation=true and --runtime-config=resource.k8s.io/v1beta1=true"
+                    elif int(str(minor)) < 32:
+                        error_msg += "DRA requires Kubernetes 1.32+ (currently using older version)"
+                    else:
+                        error_msg += "DRA should be available by default in this version. Check cluster configuration."
+                except (ValueError, TypeError):
+                    pass
+            else:
+                error_msg = f"DRA API group '{DRA_API_GROUP}' not found in cluster"
+
+            Logger.error(error_msg)
+            return False, error_msg, ""
+
+        # Prefer v1 (GA) over v1beta1 (beta)
+        # Filter to only structured API versions we support
+        if "v1" in dra_versions:
+            dra_api_version = "v1"
+            Logger.info("Using DRA v1 API (GA, enabled by default in K8s 1.34+)")
+        elif "v1beta1" in dra_versions:
+            dra_api_version = "v1beta1"
+            Logger.warning(
+                "Using DRA v1beta1 API (Beta). Note: In K8s 1.32-1.33, DynamicResourceAllocation feature gate must be explicitly enabled on all components."
+            )
+
+            # Verify feature gate is actually enabled on control plane components
+            components_to_check = [
+                "kube-apiserver",
+                "kube-scheduler",
+                "kube-controller-manager",
+            ]
+            all_enabled, status, gate_error = check_feature_gate_enabled(
+                components_to_check
+            )
+
+            if not all_enabled:
+                error_msg = (
+                    f"DRA v1beta1 API requires DynamicResourceAllocation feature gate enabled. "
+                    f"Feature gate check failed: {gate_error}. Component status: {status}. "
+                    f"Ensure --feature-gates=DynamicResourceAllocation=true is set."
+                )
+                Logger.error(error_msg)
+                return False, error_msg, ""
+            else:
+                Logger.info(
+                    f"Verified DynamicResourceAllocation feature gate is enabled on components: {list(status.keys())}"
+                )
+        else:
+            # Check if only older opaque API versions are available
+            unsupported_msg = f"Only unsupported DRA API versions found: {dra_versions}. Requires v1beta1 (K8s 1.32+) or v1 (K8s 1.34+)"
+            Logger.error(unsupported_msg)
+            return False, unsupported_msg, ""
+
+        Logger.info(f"Using DRA API version {dra_api_version}")
+
+        # Validate by trying to list DeviceClasses
+        # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
+        ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
+            group=DRA_API_GROUP, version=dra_api_version, plural="deviceclasses"
+        )
+
+        if ret_code != 0:
+            error_msg = f"Failed to list DeviceClasses with {dra_api_version}: {err}"
+            Logger.error(error_msg)
+            return False, error_msg, ""
+
+        Logger.info(
+            f"DRA API (DeviceClass) is available and validated with version {dra_api_version}"
+        )
+        return True, "", dra_api_version
+
+    except Exception as e:
+        error_msg = f"Failed to query DRA API availability: {e}"
+        Logger.error(error_msg)
+        return False, error_msg, ""
+
+
+def get_dra_api_version(environment=None) -> str:
+    """
+    Determine the DRA structured API version available in the cluster.
+
+    This function checks for a cached version in the environment object first
+    (if provided), otherwise detects it by calling check_dra_api_available().
+
+    Args:
+        environment: Optional test environment object that may have cached dra_api_version
+
+    Returns: API version string (v1beta1 or v1), or empty string if not available
+    """
+    # Check if version is cached in environment
+    if environment and hasattr(environment, "dra_api_version"):
+        return environment.dra_api_version
+
+    # Otherwise detect it
+    _, _, api_version = check_dra_api_available()
+    return api_version
 
 
 def create_resource_class(
@@ -88,7 +304,7 @@ def create_resource_class(
 ) -> Tuple[int, str, str]:
     """
     Create a ResourceClass for DRA
-    
+
     Equivalent kubectl command:
         kubectl apply -f - <<EOF
         apiVersion: resource.k8s.io/<version>
@@ -165,7 +381,7 @@ def create_resource_claim(
 ) -> Tuple[int, str, str]:
     """
     Create a ResourceClaim
-    
+
     Equivalent kubectl command:
         kubectl apply -f - <<EOF
         apiVersion: resource.k8s.io/<version>
@@ -229,7 +445,7 @@ def get_resource_claim(name: str, namespace: str) -> Optional[Dict]:
         version=get_dra_api_version(),
         namespace=namespace,
         plural="resourceclaims",
-        name=name
+        name=name,
     )
 
     if ret_code == 0:
@@ -242,7 +458,7 @@ def get_resource_claim(name: str, namespace: str) -> Optional[Dict]:
 def delete_resource_claim(name: str, namespace: str) -> Tuple[int, str, str]:
     """
     Delete a ResourceClaim
-    
+
     Equivalent kubectl command:
         kubectl delete resourceclaim <name> -n <namespace>
 
@@ -302,7 +518,7 @@ def list_resource_claims(namespace: str = None) -> List[Dict]:
             ret_code, items, err = k8_util.k8_get_custom_resource_objects(
                 group=DRA_API_GROUP,
                 version=get_dra_api_version(),
-                plural="resourceclaims"
+                plural="resourceclaims",
             )
             if ret_code == 0:
                 return items
@@ -317,7 +533,7 @@ def list_resource_claims(namespace: str = None) -> List[Dict]:
 def cleanup_resource_claims(namespace: str = None) -> None:
     """
     Clean up all ResourceClaims in a namespace
-    
+
     Equivalent kubectl command:
         kubectl delete resourceclaims --all -n <namespace>           # for specific namespace
         kubectl delete resourceclaims --all --all-namespaces         # for all namespaces
@@ -449,7 +665,7 @@ def create_pod_with_resource_claim(
                 namespace=namespace,
                 pod_list=[pod_name],
                 sleep_time=10,
-                total_attempts=30
+                total_attempts=30,
             )
             if ret_code != 0:
                 Logger.error(f"Pod {pod_name} failed to reach Running state")
@@ -464,10 +680,10 @@ def create_pod_with_resource_claim(
 def generate_dra_driver_values(images: Dict, output_file: str) -> bool:
     """
     Generate Helm values.yaml for DRA driver
-    
+
     Equivalent Helm command:
         helm install <release-name> <chart> --values <output_file>
-    
+
     Note: This function generates the values file; no direct kubectl equivalent.
 
     Args:
@@ -565,17 +781,17 @@ def get_dra_device_allocations(namespace: str = None) -> Dict[str, List[str]]:
 def verify_dra_driver_crds() -> Tuple[bool, List[str]]:
     """
     Verify that DRA resources are available (either as CRDs or built-in)
-    
+
     Equivalent kubectl command (K8s 1.26-1.33 with CRDs):
         kubectl get crds | grep resource.k8s.io
         kubectl get crd resourceclaims.resource.k8s.io
         kubectl get crd resourceclasses.resource.k8s.io
         kubectl get crd resourceclaimtemplates.resource.k8s.io
-    
+
     For K8s 1.34+ (built-in resources):
         kubectl api-resources | grep resource.k8s.io
         kubectl get resourceclaims --all-namespaces
-        kubectl get deviceclasses  # Note: ResourceClass renamed to DeviceClass in v1
+        kubectl get deviceclasses  # Both v1beta1 and v1 use DeviceClass
 
     Returns:
         Tuple of (success, list of unavailable resources)
@@ -585,14 +801,12 @@ def verify_dra_driver_crds() -> Tuple[bool, List[str]]:
     # In K8s 1.34+, these are built-in resources, not CRDs
     # We'll check if the API is available instead
     api_version = get_dra_api_version()
-    
+
     unavailable = []
 
     # Check ResourceClaims - Use existing k8_util helper
     ret_code, items, err = k8_util.k8_get_custom_resource_objects(
-        group=DRA_API_GROUP,
-        version=api_version,
-        plural="resourceclaims"
+        group=DRA_API_GROUP, version=api_version, plural="resourceclaims"
     )
     if ret_code == 0:
         Logger.info("ResourceClaim API is available")
@@ -600,17 +814,15 @@ def verify_dra_driver_crds() -> Tuple[bool, List[str]]:
         unavailable.append("resourceclaims.resource.k8s.io")
         Logger.error(f"ResourceClaim API not available: {err}")
 
-    # Check DeviceClasses (ResourceClass in older versions) - Use existing k8_util helper
-    device_class_plural = "deviceclasses" if api_version == "v1" else "resourceclasses"
+    # Check DeviceClasses - Both v1beta1 and v1 use "deviceclasses"
+    # (The older opaque API used "resourceclasses" but we don't support that)
     ret_code, items, err = k8_util.k8_get_custom_resource_objects(
-        group=DRA_API_GROUP,
-        version=api_version,
-        plural=device_class_plural
+        group=DRA_API_GROUP, version=api_version, plural="deviceclasses"
     )
     if ret_code == 0:
-        Logger.info(f"{device_class_plural.capitalize()} API is available")
+        Logger.info("DeviceClass API is available")
     else:
-        unavailable.append(f"{device_class_plural}.resource.k8s.io")
-        Logger.error(f"{device_class_plural.capitalize()} API not available: {err}")
+        unavailable.append("deviceclasses.resource.k8s.io")
+        Logger.error(f"DeviceClass API not available: {err}")
 
     return len(unavailable) == 0, unavailable

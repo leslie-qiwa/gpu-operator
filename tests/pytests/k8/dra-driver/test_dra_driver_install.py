@@ -36,20 +36,28 @@ Logger = logging.getLogger("k8.test_dra_driver_install")
 DRA_DRIVER_CHART_NAME = "k8s-gpu-dra-driver"
 
 
-def check_amd_gpu_deviceclass_exists(deviceclass_name="gpu.amd.com"):
+def check_amd_gpu_deviceclass_exists(environment, deviceclass_name="gpu.amd.com"):
     """Check if AMD GPU DeviceClass exists
 
     Args:
+        environment: Test environment object (contains cached dra_api_version)
         deviceclass_name: Name of the DeviceClass to check (default: gpu.amd.com)
 
     Returns:
         tuple: (bool, str) - (exists, deviceclass_name or error_message)
     """
+    # Use cached DRA API version from environment
+    dra_api_version = dra_util.get_dra_api_version(environment)
+    if not dra_api_version:
+        error_msg = "DRA API not available in this cluster"
+        Logger.error(error_msg)
+        return False, error_msg
+
     # Use existing k8_util helper
     # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
     ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
         group="resource.k8s.io",
-        version="v1",
+        version=dra_api_version,
         plural="deviceclasses"
     )
 
@@ -103,7 +111,7 @@ def check_dra_driver_pods(dra_driver_release_name, dra_driver_namespace, environ
 
 def check_dra_driver_resource_class(environment):
     """Check that AMD GPU DeviceClass is created
-    
+
     Args:
         environment: Test environment
     """
@@ -111,7 +119,7 @@ def check_dra_driver_resource_class(environment):
     time.sleep(10)
 
     # Check if AMD GPU DeviceClass exists
-    amd_gpu_class_found, message = check_amd_gpu_deviceclass_exists("gpu.amd.com")
+    amd_gpu_class_found, message = check_amd_gpu_deviceclass_exists(environment, "gpu.amd.com")
     
     if amd_gpu_class_found:
         Logger.info(f"Found AMD GPU DeviceClass: {message}")
@@ -350,8 +358,8 @@ def test_dra_driver_uninstall(
         )
 
     # Verify AMD GPU DeviceClass is deleted
-    amd_gpu_class_exists, message = check_amd_gpu_deviceclass_exists("gpu.amd.com")
-    
+    amd_gpu_class_exists, message = check_amd_gpu_deviceclass_exists(environment, "gpu.amd.com")
+
     if amd_gpu_class_exists:
         Logger.warning(f"AMD GPU DeviceClass 'gpu.amd.com' still exists after uninstall")
     else:
