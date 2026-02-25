@@ -1,6 +1,6 @@
 # CICD test image
 TEST_CONTAINER_URL ?= registry.test.pensando.io:5000/pensando/gpu-op
-TEST_CONTAINER_VERSION ?=1.8
+TEST_CONTAINER_VERSION ?=1.9
 
 install-docker:
 	mkdir tmp_pkgs; cd tmp_pkgs; \
@@ -28,10 +28,10 @@ docker/shell: docker/build-shell-image
 	docker run --rm --privileged --cgroupns=host -v /lib/modules:/lib/modules:ro -v /sys/fs/cgroup:/sys/fs/cgroup -v /sys:/sys -p 6443:6443 --name gpu-operator -v "$(shell pwd)/../":/gpu-operator -w /gpu-operator -it pensando/gpu-operator:test su -l $(shell whoami)
 
 build-kind-node:
-	docker build -t registry.test.pensando.io:5000/kindest-node:v1.31.2 -f Dockerfile_kind .
+	docker build -t registry.test.pensando.io:5000/kindest-node:v1.32.0 -f Dockerfile_kind .
 
 push-kind-node:
-	docker push registry.test.pensando.io:5000/kindest-node:v1.31.2
+	docker push registry.test.pensando.io:5000/kindest-node:v1.32.0
 
 deploy-k8s-kind-1c:
 	/usr/local/bin/kind create cluster --config=./deploy/kind-config.yaml --name dind-cluster

@@ -1,3 +1,3 @@
-from kindest/node:v1.31.2
+from kindest/node:v1.32.0
 
 RUN sed -i 's/^PRETTY_NAME=.*/PRETTY_NAME="Ubuntu 22.04.4 LTS"/' /etc/os-release

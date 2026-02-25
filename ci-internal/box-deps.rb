@@ -38,7 +38,7 @@ run "curl -o /usr/local/bin/kubectl -LO 'https://dl.k8s.io/release/v1.34.3/bin/l
 #run "curl -sSL https://github.com/containerd/nerdctl/releases/download/v2.0.0/nerdctl-2.0.0-linux-amd64.tar.gz | tar xzf -C /usr/local/bin && chmod +x /usr/local/bin/nerdctl"
 
 # install kind
-run "wget -O/usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.25.0/kind-linux-amd64 && chmod +x /usr/local/bin/kind"
+run "wget -O/usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.31.0/kind-linux-amd64 && chmod +x /usr/local/bin/kind"
 
 # install python modules required for pytest-based test-automation
 run "apt update && apt install -y jq python3.10-venv python3-pytest python3-virtualenv sshpass"

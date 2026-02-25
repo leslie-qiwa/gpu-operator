@@ -98,12 +98,42 @@ Below is an example of a full DeviceConfig CR that can be used to install the AM
             effect: "NoSchedule"
       ## AMD K8s Device Plugin Configuration ##
       devicePlugin: 
+        # Set to True to enable device plugin for GPU resource allocation (default)
+        # Cannot be enabled at the same time as DRA driver
+        enableDevicePlugin: true
         # (Optional) Specifying image names are optional. Default image names for shown here if not specified.
         devicePluginImage: rocm/k8s-device-plugin:latest # Change this to trigger metrics exporter upgrade on CR update
         nodeLabellerImage: rocm/k8s-device-plugin:labeller-latest # Change this to trigger metrics exporter upgrade on CR update
         upgradePolicy:
           #(Optional) If no UpgradePolicy is mentioned for any of the components but their image is changed, the daemonset will
           # get upgraded according to the defaults, which is `upgradeStrategy` set to `RollingUpdate` and `maxUnavailable` set to 1. 
+          upgradeStrategy: "RollingUpdate" # (Optional) Can be either `RollingUpdate` or `OnDelete`
+          maxUnavailable: 1 # (Optional) Number of pods that can be unavailable during the upgrade process. 1 is the default value
+      ## AMD DRA (Dynamic Resource Allocation) Driver Configuration ##
+      ## Note: DRA driver and Device Plugin cannot be enabled at the same time.
+      ## For detailed DRA driver documentation, see: https://github.com/ROCm/k8s-gpu-dra-driver
+      draDriver:
+        # Set to True to enable DRA driver for GPU resource allocation (requires Kubernetes 1.31+)
+        # Set to False (default) to use the traditional Device Plugin instead
+        enable: false
+        # DRA driver image
+        image: rocm/k8s-gpu-dra-driver:latest
+        # DRA driver image pull policy: Always, IfNotPresent, or Never
+        imagePullPolicy: IfNotPresent
+        # (Optional) DRA driver image pull secret for private registries
+        imageRegistrySecret:
+          name: my-image-secret
+        # (Optional) tolerations for DRA driver to run on tainted nodes
+        tolerations:
+          - key: "example-key"
+            operator: "Equal"
+            value: "example-value"
+            effect: "NoSchedule"
+        # (Optional) pass supported flags and their values while starting DRA driver daemonset
+        cmdLineArguments: {}
+        # (Optional) DRA driver node selector, if not specified it will reuse spec.selector
+        selector: {}
+        upgradePolicy:
           upgradeStrategy: "RollingUpdate" # (Optional) Can be either `RollingUpdate` or `OnDelete`
           maxUnavailable: 1 # (Optional) Number of pods that can be unavailable during the upgrade process. 1 is the default value
       ## AMD GPU Metrics Exporter Configuration ##
@@ -168,6 +198,7 @@ The below is an example of the minimal DeviceConfig CR that can be used to insta
     driver:
       enable: False # Set to False to skip driver installation to use inbox or pre-installed driver on worker nodes
     devicePlugin:
+      enableDevicePlugin: True
       enableNodeLabeller: True
     metricsExporter:
       enable: True # To enable/disable the metrics exporter, disabled by default
