@@ -262,6 +262,7 @@ image:
 
 logfiles:
   - /gpu-operator/techsupport.tgz
+  - /gpu-operator/e2e-artifacts.tgz
 
 jobs:
   api:

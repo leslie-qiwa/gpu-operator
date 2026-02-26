@@ -23,6 +23,15 @@ trap '
     fi
     sleep 5
   done
+
+  # Bundle e2e-artifacts (per-test logs + snapshots from TestMonitor)
+  if [ -d tests/e2e/e2e-artifacts ]; then
+    echo ">>> Packaging e2e-artifacts..."
+    tar czf e2e-artifacts.tgz -C tests/e2e e2e-artifacts
+    echo ">>> e2e-artifacts.tgz created ($(du -sh e2e-artifacts.tgz | cut -f1))"
+  else
+    echo ">>> No e2e-artifacts directory found, skipping"
+  fi
 ' EXIT
 
 # Run the e2e tests
