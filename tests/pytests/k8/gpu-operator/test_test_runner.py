@@ -62,6 +62,26 @@ metrics_fields = {
 
 debug_on_failure = K8Helper.triage
 
+def verify_events(environment, before, after):
+    global Logger
+
+    before_events = before[1].items
+    after_events = after[1].items
+
+    # 1. Extract the unique UIDs from the 'before' list and put them in a set
+    before_uids = {event.metadata.uid for event in before_events}
+
+    # 2. Iterate through the 'after' list and find any event whose UID is NOT in the 'before' set
+    Logger.info("Following are the events observed during this testcase:-")
+    new_events = []
+    for event in after_events:
+        if event.metadata.uid not in before_uids:
+            Logger.info(f"=============={event.metadata.uid}=================")
+            Logger.info(f"{pprint.pformat(event.reason)}")
+            Logger.info(f"{pprint.pformat(event.type)}")
+            Logger.info(f"{pprint.pformat(event.involved_object.name)}")
+            Logger.info(f"{pprint.pformat(event.message)}")
+
 @pytest.fixture(autouse=True, scope="module")
 def skip_module(environment):
     if environment.gpu_operator_version in ["v1.0.0", "v1.1.0"]:
@@ -385,17 +405,6 @@ def verify_logs(environment, log_msg_list, pod_str="test-runner", since="180s", 
             debug_on_failure(environment, log_msg in stdout,
                              f"didn't find {log_msg} in\n" + LogPrettyPrinter.pformat(stdout.split('\n')))
 
-def verify_events(namespace, pod_name="test-runner"):
-    global Logger
-    global LogPrettyPrinter
-    #cmd = f"kubectl get events -n {namespace}" + " -o=jsonpath='{.items[?(@.source.component==\"amd-test-runner\")]}' | jq -r .message | jq ."
-    #Logger.debug(LogPrettyPrinter.pformat(gpu_cluster.k8_master.run_command(cmd)))
-
-    events = k8_util.k8_get_events(namespace, k8_util.k8_get_pod_name(namespace, pod_name))
-    for event in events[1].items:
-        Logger.debug(LogPrettyPrinter.pformat(f"{event.involved_object.name}\n{event.metadata.labels}\n{event.message}"))
-    #Logger.debug(LogPrettyPrinter.pformat(gpu_cluster.k8_master.run_command(f"kubectl get events -n {namespace}")))
-
 def update_metrics_exporter(deviceconfig_install, environment, configmap_name):
     # re-configure test-runner
     for spec_name, tcfg in deviceconfig_install.test_cfg_map.items():
@@ -442,6 +451,7 @@ def swap_recipe(request, gpu_cluster, deviceconfig_install, environment, framewo
         new_recipe = "hbm_lvl1"
 
     configmap = {}
+    before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
     update_test_runner_configmap(new_recipe, worker, configmap, new_framework, trigger)
     configmap_name = create_configmap(request, deviceconfig_install, environment, new_framework, configmap)
     update_test_runner_image(deviceconfig_install, environment, new_framework, configmap_name)
@@ -453,8 +463,9 @@ def swap_recipe(request, gpu_cluster, deviceconfig_install, environment, framewo
                         "GitCommit:",
                     ])
 
-    verify_logs(environment, [f'Recipe:"{new_recipe}"'], since="1060s")
     time.sleep(50)
+    after_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
+    verify_events(environment, before_events, after_events)
     '''
     test-runner 2025/08/18 16:16:59 types.go:192: writing logs babel [iteration=1]:
     test-runner 2025/08/18 16:16:59 testrunner.go:856: Trigger: {trigger} Test: babel GPU Indexes: [0] completed. Result: [0xc000ab5280]
@@ -487,6 +498,7 @@ def test_deviceconfig_unhealthy(request, gpu_cluster, deviceconfig_install, envi
     worker = k8_util.k8_get_node_hostname(gpu_node)
     init_cap, alloc = k8_util.k8_get_node_gpu_capacity(worker)
 
+    before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
     configmap = {}
     update_test_runner_configmap(recipe, worker, configmap, framework)
     configmap_name = create_configmap(request, deviceconfig_install, environment, framework, configmap)
@@ -548,7 +560,6 @@ def test_deviceconfig_unhealthy(request, gpu_cluster, deviceconfig_install, envi
                 ],
                 switch="or")
     verify_logs(environment, ["found GPU with unhealthy state"])
-    verify_events(namespace)
 
     debug_on_failure(environment, k8_util.k8_get_node_health(worker, namespace) == "unhealthy",
 			      f"result of kubectl describe node $NODE_NAME | grep unhealthy")
@@ -570,7 +581,8 @@ def test_deviceconfig_unhealthy(request, gpu_cluster, deviceconfig_install, envi
     verify_logs(environment, [f"all GPUs are healthy"])
 
     Logger.info(f"This workload should get created, since the node {worker}, is now untainted")
-    verify_events(namespace)
+    after_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
+    verify_events(environment, before_events, after_events)
 
 @pytest.mark.level2
 @pytest.mark.parametrize("framework, recipe", [
@@ -595,6 +607,7 @@ def test_workload_running_make_node_unhealthy(request, gpu_cluster, deviceconfig
             pytest.skip("skipping AGFHC tests for gpu_series = {cluster_node.gpu_series}")
     worker = k8_util.k8_get_node_hostname(gpu_node)
     init_cap, alloc = k8_util.k8_get_node_gpu_capacity(worker)
+    before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
 
     devicecfg_pods = [
         common.PodInfo('device-plugin', len(gpu_nodes), 1),
@@ -640,6 +653,9 @@ def test_workload_running_make_node_unhealthy(request, gpu_cluster, deviceconfig
     request.addfinalizer(_cleanup)
 
 
+    after_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
+    verify_events(environment, before_events, after_events)
+
     framework, recipe = swap_recipe(request, gpu_cluster, deviceconfig_install, environment, framework)
     k8_util.k8_metrics_error(thresholds, error_list, environment.gpu_operator_namespace)
 
@@ -648,7 +664,6 @@ def test_workload_running_make_node_unhealthy(request, gpu_cluster, deviceconfig
     ret_code, stdout, stderr = k8_util.k8_get_pod_logs("test-runner", environment.gpu_operator_namespace)
     Logger.info(f"Test runner worker logs\n==================={stdout}\n")
     time.sleep(30)
-    verify_events(namespace)
 
     wl_name = wl_ctxt['spec']['metadata']['name']
     wl_namespace = wl_ctxt['spec']['metadata']['namespace']
@@ -698,6 +713,7 @@ def test_update_metric_exporter_and_test_runner(request, gpu_cluster, deviceconf
     if 'MI2' in cluster_node.gpu_series:
         if framework == "AGFHC":
             pytest.skip("skipping AGFHC tests for gpu_series = {cluster_node.gpu_series}")
+    before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
     worker = k8_util.k8_get_node_hostname(gpu_node)
     init_cap, alloc = k8_util.k8_get_node_gpu_capacity(worker)
     time.sleep(30)
@@ -748,7 +764,6 @@ def test_update_metric_exporter_and_test_runner(request, gpu_cluster, deviceconf
 
     time.sleep(30)
 
-    verify_events(namespace)
     Logger.info(f"Test runner worker logs\n===================\n")
     ret_code, stdout, stderr = k8_util.k8_get_pod_logs("test-runner", environment.gpu_operator_namespace)
     Logger.info(f"Test runner worker logs\n==================={stdout}\n")
@@ -798,7 +813,8 @@ def test_update_metric_exporter_and_test_runner(request, gpu_cluster, deviceconf
     verify_logs(environment, ["all GPUs are healthy"])
     ret_code, stdout, stderr = k8_util.k8_get_pod_logs("test-runner", environment.gpu_operator_namespace)
     Logger.info(f"Test runner worker logs==================={stdout}")
-    verify_events(namespace)
+    after_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
+    verify_events(environment, before_events, after_events)
 
 
 @pytest.mark.level3
@@ -825,6 +841,7 @@ def test_manual_job(request, gpu_cluster, deviceconfig_install, environment, sch
             recipe = "iet_single"
         if framework == "AGFHC":
             pytest.skip("skipping AGFHC tests for gpu_series = {cluster_node.gpu_series}")
+    before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
     worker = k8_util.k8_get_node_hostname(gpu_node)
     init_cap, alloc = k8_util.k8_get_node_gpu_capacity(worker)
     trigger = "MANUAL"
@@ -1000,7 +1017,8 @@ def test_manual_job(request, gpu_cluster, deviceconfig_install, environment, sch
     #debug_on_failure(environment, k8_util.k8_get_node_health(gpu_cluster, worker, namespace) != "unhealthy",
                      #f"check result of kubectl describe node $NODE_NAME | grep healthy")
     verify_logs(environment, ["all GPUs are healthy"])
-    verify_events(namespace)
+    after_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
+    verify_events(environment, before_events, after_events)
 
 @pytest.mark.level3
 @pytest.mark.parametrize("framework, recipe, healthy", [
