@@ -31,58 +31,93 @@ from lib.util import K8Helper
 Logger = logging.getLogger("k8.dra-driver.conftest")
 
 
-def check_dra_api_available(environment):
-    """Check if DRA API is available in the cluster.
-    
-    Supports different K8s versions:
-    - K8s 1.26-1.29: v1alpha2
-    - K8s 1.30-1.31: v1alpha3
-    - K8s 1.32+: v1
-    
-    Returns:
-        tuple: (bool, str) - (success, error_message)
+@pytest.fixture(scope="session")
+def dra_api_version(environment):
     """
-    try:
-        # Get Kubernetes version
-        ret_code, version_info = k8_util.k8_get_version()
-        if ret_code != 0:
-            return False, "Failed to get Kubernetes version"
-        
-        major_version = int(version_info.get("major", 0))
-        minor_version = int(version_info.get("minor", 0))
-        
-        # Determine DRA API version based on K8s version
-        if major_version > 1 or (major_version == 1 and minor_version >= 32):
-            dra_api_version = "v1"
-        elif major_version == 1 and minor_version >= 30:
-            dra_api_version = "v1alpha3"
-        elif major_version == 1 and minor_version >= 26:
-            dra_api_version = "v1alpha2"
-        else:
-            return False, f"DRA not supported in Kubernetes {major_version}.{minor_version} (requires 1.26+)"
-        
-        Logger.info(f"Checking DRA API availability with version {dra_api_version}")
+    Detect and validate DRA API version based on Kubernetes version.
 
-        # Try to list DeviceClasses using the detected API version
-        # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
-        ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
-            group="resource.k8s.io",
-            version=dra_api_version,
-            plural="deviceclasses"
+    This fixture runs once per test session and enforces version-specific requirements:
+    - K8s 1.34+: Requires DRA v1 API (GA, enabled by default)
+    - K8s 1.32-1.33: Requires DRA v1beta1 API with DynamicResourceAllocation feature gate enabled
+    - K8s < 1.32: Skips tests (DRA not supported)
+
+    Returns:
+        str: DRA API version (v1beta1 or v1)
+    """
+    global Logger
+
+    # Check if already cached in environment
+    if hasattr(environment, 'dra_api_version'):
+        Logger.debug(f"Using cached DRA API version: {environment.dra_api_version}")
+        return environment.dra_api_version
+
+    # Get Kubernetes version
+    Logger.info("Detecting Kubernetes version and validating DRA requirements")
+    ret_code, version_info = k8_util.k8_get_version()
+    if ret_code != 0:
+        pytest.fail("Failed to get Kubernetes version")
+
+    major = int(version_info.get("major", 0))
+    minor = int(version_info.get("minor", 0))
+    Logger.info(f"Kubernetes version: {major}.{minor}")
+
+    # Detect DRA API availability and version
+    dra_available, error_msg, api_version = dra_util.check_dra_api_available()
+
+    # K8s 1.34+: Must have v1 API (GA)
+    if major > 1 or (major == 1 and minor >= 34):
+        if not dra_available:
+            pytest.fail(
+                f"K8s {major}.{minor} requires DRA v1 API, but DRA is not available: {error_msg}"
+            )
+        if api_version != "v1":
+            pytest.fail(
+                f"K8s {major}.{minor} requires DRA v1 API (GA), but found {api_version}. "
+                f"DRA should be enabled by default in K8s 1.34+. Check cluster configuration."
+            )
+        Logger.info(f"✓ K8s {major}.{minor} has DRA v1 API (GA) as expected")
+
+    # K8s 1.32-1.33: Must have v1beta1 API with feature gate enabled
+    elif major == 1 and minor >= 32:
+        if not dra_available:
+            pytest.fail(
+                f"K8s {major}.{minor} requires DRA v1beta1 API with feature gate enabled, "
+                f"but DRA is not available: {error_msg}"
+            )
+        if api_version != "v1beta1":
+            pytest.fail(
+                f"K8s {major}.{minor} requires DRA v1beta1 API (beta), but found {api_version}"
+            )
+
+        # Verify feature gate is enabled on control plane components
+        Logger.info("Verifying DynamicResourceAllocation feature gate is enabled...")
+        components = ["kube-apiserver", "kube-scheduler", "kube-controller-manager"]
+        all_enabled, status, gate_error = dra_util.check_feature_gate_enabled(components)
+
+        if not all_enabled:
+            pytest.fail(
+                f"K8s {major}.{minor} with DRA v1beta1 requires DynamicResourceAllocation feature gate enabled. "
+                f"Feature gate check failed: {gate_error}. Component status: {status}. "
+                f"Enable with --feature-gates=DynamicResourceAllocation=true on kube-apiserver, "
+                f"kube-scheduler, kube-controller-manager, and kubelet. "
+                f"Also ensure --runtime-config=resource.k8s.io/v1beta1=true on kube-apiserver."
+            )
+
+        Logger.info(
+            f"✓ K8s {major}.{minor} has DRA v1beta1 API with feature gate enabled on: {list(status.keys())}"
         )
 
-        if ret_code != 0:
-            error_msg = f"Failed to list DeviceClasses: {err}"
-            Logger.error(error_msg)
-            return False, error_msg
+    # K8s < 1.32: Skip tests (DRA not supported)
+    else:
+        pytest.skip(
+            f"DRA requires Kubernetes 1.32+ (structured API), but cluster is running {major}.{minor}"
+        )
 
-        Logger.info(f"DRA API (DeviceClass) is available with version {dra_api_version}")
-        return True, ""
-        
-    except Exception as e:
-        error_msg = f"DRA API not available: {e}"
-        Logger.error(error_msg)
-        return False, error_msg
+    # Cache in environment for reuse
+    setattr(environment, 'dra_api_version', api_version)
+    Logger.info(f"DRA API version validated and cached: {api_version}")
+
+    return api_version
 
 
 @pytest.fixture(scope="session")
@@ -98,7 +133,7 @@ def dra_driver_namespace(environment):
 
 @pytest.fixture(scope="session", autouse=True)
 def init_dra_testbed(
-    request, gpu_cluster, dra_driver_release_name, dra_driver_namespace, environment
+    request, gpu_cluster, dra_driver_release_name, dra_driver_namespace, environment, dra_api_version
 ):
     """Initialize DRA test environment"""
     global Logger
@@ -129,11 +164,8 @@ def init_dra_testbed(
     # Init k8 cluster for DRA testing
     k8_util.k8_init_cluster(gpu_cluster, [dra_driver_namespace])
 
-    # Check DRA API availability as prerequisite
-    Logger.info("Checking DRA API availability as prerequisite")
-    dra_available, error_msg = check_dra_api_available(environment)
-    if not dra_available:
-        pytest.skip(f"DRA API is not available in the cluster - {error_msg}")
+    # DRA API version is already checked and cached by dra_api_version fixture
+    Logger.info(f"DRA API version validated: {dra_api_version}")
 
     yield
     # NOTE: Session teardown cleanup is intentionally NOT done here to allow manual
@@ -146,24 +178,13 @@ def init_dra_testbed(
 
 @pytest.fixture(scope="module")
 def dra_driver_install(
-    gpu_cluster, dra_driver_release_name, dra_driver_namespace, images, environment
+    gpu_cluster, dra_driver_release_name, dra_driver_namespace, images, environment, dra_api_version
 ):
     """Install DRA driver using Helm chart"""
     global Logger
 
-    # Check if DRA is enabled (requires K8s 1.32+)
-    ret_code, version_info = k8_util.k8_get_version()
-    K8Helper.triage(environment, ret_code == 0, "Failed to get Kubernetes version")
-
-    major_version = int(version_info.get("major", 0))
-    minor_version = int(version_info.get("minor", 0))
-
-    # Skip instead of fail for older K8s versions (customer may have K8s 1.29)
-    if not ((major_version > 1) or (major_version == 1 and minor_version >= 32)):
-        pytest.skip(
-            f"DRA requires Kubernetes 1.32+, found {major_version}.{minor_version}. "
-            f"Skipping DRA driver tests for this cluster."
-        )
+    # Use cached DRA API version from session fixture
+    Logger.info(f"Using DRA API version: {dra_api_version}")
 
     # Check for and clean up any existing DRA installations
     Logger.info("Checking for existing DRA driver installations")
@@ -187,7 +208,7 @@ def dra_driver_install(
     # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
     ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
         group="resource.k8s.io",
-        version="v1",
+        version=dra_api_version,
         plural="deviceclasses"
     )
 
@@ -210,7 +231,7 @@ def dra_driver_install(
                 # kubectl equivalent: kubectl delete deviceclass <dc_name>
                 ret_code, stdout, stderr = k8_util.k8_delete_custom_resource(
                     group="resource.k8s.io",
-                    version="v1",
+                    version=dra_api_version,
                     plural="deviceclasses",
                     namespace=None,  # DeviceClass is cluster-scoped
                     name=dc_name,
