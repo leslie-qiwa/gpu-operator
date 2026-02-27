@@ -299,9 +299,7 @@ def get_dra_api_version(environment=None) -> str:
     return api_version
 
 
-def create_resource_class(
-    name: str, driver_name: str = "gpu.amd.com", parameters: Optional[Dict] = None
-) -> Tuple[int, str, str]:
+def check_dra_api_available() -> Tuple[bool, str, str]:
     """
     Create a ResourceClass for DRA
 
@@ -314,113 +312,252 @@ def create_resource_class(
         driverName: <driver_name>
         EOF
 
-    Args:
-        name: Name of the ResourceClass
-        driver_name: DRA driver name (default: gpu.amd.com)
-        parameters: Optional parameters for the ResourceClass
+    We only support the newer "structured API" DRA which went beta in K8s 1.32
+    and GA in K8s 1.34. The older "opaque API" is not supported.
+
+    This function queries the Kubernetes API server directly to determine which
+    DRA API version is available, preferring v1 (GA) over v1beta1 (beta).
+
+    Equivalent kubectl commands:
+        # Check available API versions
+        kubectl api-versions | grep resource.k8s.io
+
+        # List API resources for the group
+        kubectl api-resources --api-group=resource.k8s.io
+
+        # List DeviceClasses to validate
+        kubectl get deviceclasses.resource.k8s.io
 
     Returns:
-        Tuple of (return_code, stdout, stderr)
+        tuple: (bool, str, str) - (success, error_message, api_version)
+            - success: True if DRA API is available, False otherwise
+            - error_message: Error message if not available, empty string otherwise
+            - api_version: DRA API version (v1beta1 or v1), empty string if not available
     """
     global Logger
 
-    resource_class = {
-        "apiVersion": f"{DRA_API_GROUP}/{get_dra_api_version()}",
-        "kind": "ResourceClass",
-        "metadata": {"name": name},
-        "driverName": driver_name,
-    }
+    try:
+        # Query available API groups and versions from the cluster
+        # This is more robust than inferring from K8s version
+        api_client = client.ApiClient()
+        apis_api = client.ApisApi(api_client)
+        api_groups = apis_api.get_api_versions()
 
-    if parameters:
-        resource_class["parametersRef"] = parameters
+        # Look for resource.k8s.io group and check available versions
+        dra_versions = []
+        for group in api_groups.groups:
+            if group.name == DRA_API_GROUP:
+                dra_versions = [v.version for v in group.versions]
+                Logger.info(
+                    f"Found DRA API group '{DRA_API_GROUP}' with versions: {dra_versions}"
+                )
+                break
 
-    # Use existing k8_util helper for creating custom resources
-    ret_code, stdout, stderr = k8_util.k8_create_custom_resource(resource_class)
-    if ret_code == 0:
-        Logger.info(f"Created ResourceClass: {name}")
-    else:
-        Logger.error(f"Failed to create ResourceClass {name}: {stderr}")
-    return ret_code, stdout, stderr
+        if not dra_versions:
+            # Get K8s version to provide helpful error message
+            ret_code, version_info = k8_util.k8_get_version()
+            if ret_code == 0:
+                major = version_info.get("major", "?")
+                minor = version_info.get("minor", "?")
+                error_msg = f"DRA API group '{DRA_API_GROUP}' not found in cluster (K8s {major}.{minor}). "
+
+                # Provide version-specific guidance
+                try:
+                    if int(str(minor)) >= 32 and int(str(minor)) <= 33:
+                        error_msg += "For K8s 1.32-1.33, ensure DynamicResourceAllocation feature gate is enabled on all components (kube-apiserver, kube-controller-manager, kube-scheduler, kubelet) with --feature-gates=DynamicResourceAllocation=true and --runtime-config=resource.k8s.io/v1beta1=true"
+                    elif int(str(minor)) < 32:
+                        error_msg += "DRA requires Kubernetes 1.32+ (currently using older version)"
+                    else:
+                        error_msg += "DRA should be available by default in this version. Check cluster configuration."
+                except (ValueError, TypeError):
+                    pass
+            else:
+                error_msg = f"DRA API group '{DRA_API_GROUP}' not found in cluster"
+
+            Logger.error(error_msg)
+            return False, error_msg, ""
+
+        # Prefer v1 (GA) over v1beta1 (beta)
+        # Filter to only structured API versions we support
+        if "v1" in dra_versions:
+            dra_api_version = "v1"
+            Logger.info("Using DRA v1 API (GA, enabled by default in K8s 1.34+)")
+        elif "v1beta1" in dra_versions:
+            dra_api_version = "v1beta1"
+            Logger.warning(
+                "Using DRA v1beta1 API (Beta). Note: In K8s 1.32-1.33, DynamicResourceAllocation feature gate must be explicitly enabled on all components."
+            )
+
+            # Verify feature gate is actually enabled on control plane components
+            components_to_check = [
+                "kube-apiserver",
+                "kube-scheduler",
+                "kube-controller-manager",
+            ]
+            all_enabled, status, gate_error = check_feature_gate_enabled(
+                components_to_check
+            )
+
+            if not all_enabled:
+                error_msg = (
+                    f"DRA v1beta1 API requires DynamicResourceAllocation feature gate enabled. "
+                    f"Feature gate check failed: {gate_error}. Component status: {status}. "
+                    f"Ensure --feature-gates=DynamicResourceAllocation=true is set."
+                )
+                Logger.error(error_msg)
+                return False, error_msg, ""
+            else:
+                Logger.info(
+                    f"Verified DynamicResourceAllocation feature gate is enabled on components: {list(status.keys())}"
+                )
+        else:
+            # Check if only older opaque API versions are available
+            unsupported_msg = f"Only unsupported DRA API versions found: {dra_versions}. Requires v1beta1 (K8s 1.32+) or v1 (K8s 1.34+)"
+            Logger.error(unsupported_msg)
+            return False, unsupported_msg, ""
+
+        Logger.info(f"Using DRA API version {dra_api_version}")
+
+        # Validate by trying to list DeviceClasses
+        # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
+        ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
+            group=DRA_API_GROUP, version=dra_api_version, plural="deviceclasses"
+        )
+
+        if ret_code != 0:
+            error_msg = f"Failed to list DeviceClasses with {dra_api_version}: {err}"
+            Logger.error(error_msg)
+            return False, error_msg, ""
+
+        Logger.info(
+            f"DRA API (DeviceClass) is available and validated with version {dra_api_version}"
+        )
+        return True, "", dra_api_version
+
+    except Exception as e:
+        error_msg = f"Failed to query DRA API availability: {e}"
+        Logger.error(error_msg)
+        return False, error_msg, ""
 
 
-def delete_resource_class(name: str) -> Tuple[int, str, str]:
+def get_dra_api_version(environment=None) -> str:
     """
-    Delete a ResourceClass
+    Determine the DRA structured API version available in the cluster.
 
-    Equivalent kubectl command:
-        kubectl delete resourceclass <name>
+    This function checks for a cached version (module-level or environment object)
+    to avoid repeated API detection and logging.
 
     Args:
-        name: Name of the ResourceClass to delete
+        environment: Optional test environment object that may have cached dra_api_version
 
-    Returns:
-        Tuple of (return_code, stdout, stderr)
+    Returns: API version string (v1beta1 or v1), or empty string if not available
     """
-    global Logger
+    global _DRA_API_VERSION_CACHE
 
-    # Use existing k8_util helper for deleting custom resources
-    ret_code, stdout, stderr = k8_util.k8_delete_custom_resource(
-        group=DRA_API_GROUP,
-        version=get_dra_api_version(),
-        plural="resourceclasses",
-        namespace=None,  # ResourceClass is cluster-scoped
-        name=name,
-    )
-    if ret_code == 0:
-        Logger.info(f"Deleted ResourceClass: {name}")
-    else:
-        Logger.error(f"Failed to delete ResourceClass {name}: {stderr}")
-    return ret_code, stdout, stderr
+    # Check module-level cache first
+    if _DRA_API_VERSION_CACHE:
+        return _DRA_API_VERSION_CACHE
+
+    # Check if version is cached in environment
+    if environment and hasattr(environment, "dra_api_version"):
+        _DRA_API_VERSION_CACHE = environment.dra_api_version
+        return environment.dra_api_version
+
+    # Otherwise detect it and cache
+    _, _, api_version = check_dra_api_available()
+    _DRA_API_VERSION_CACHE = api_version
+    return api_version
+
+
+# Note: DeviceClass creation/deletion functions removed.
+# Tests now use the default 'gpu.amd.com' DeviceClass created by Helm installation.
+# If you need to create custom DeviceClass objects for testing, use kubectl directly
+# or k8_util.k8_create_custom_resource() with the appropriate DeviceClass manifest.
 
 
 def create_resource_claim(
     name: str,
     namespace: str,
     resource_class: str,
-    allocation_mode: str = "WaitForFirstConsumer",
+    device_count: int = 1,
 ) -> Tuple[int, str, str]:
     """
     Create a ResourceClaim
 
     Equivalent kubectl command:
         kubectl apply -f - <<EOF
-        apiVersion: resource.k8s.io/<version>
+        apiVersion: resource.k8s.io/v1
         kind: ResourceClaim
         metadata:
           name: <name>
           namespace: <namespace>
         spec:
-          resourceClassName: <resource_class>
-          allocationMode: <allocation_mode>
+          devices:
+            requests:
+              - name: gpu-0
+                exactly:
+                  deviceClassName: <resource_class>
+                  allocationMode: ExactCount
+                  count: 1
         EOF
+
+    Note: In DRA v1, allocationMode values are:
+    - ExactCount: Request exact count of devices
+    - All: Request all available devices
+
+    This is different from PV's WaitForFirstConsumer/Immediate modes.
 
     Args:
         name: Name of the ResourceClaim
         namespace: Namespace for the ResourceClaim
-        resource_class: Name of the ResourceClass to use
-        allocation_mode: Allocation mode (WaitForFirstConsumer or Immediate)
+        resource_class: Name of the DeviceClass to use (e.g., 'gpu.amd.com')
+        device_count: Number of GPU devices to request (default: 1)
 
     Returns:
         Tuple of (return_code, stdout, stderr)
     """
     global Logger
 
+    # Build device requests for structured parameters API (v1/v1beta1)
+    # v1 API requires 'exactly' or 'firstAvailable' within each request
+    device_requests = []
+    for i in range(device_count):
+        device_requests.append(
+            {
+                "name": f"gpu-{i}",
+                "exactly": {
+                    "deviceClassName": resource_class,
+                    "allocationMode": "ExactCount",  # DRA allocation mode (not PV mode)
+                    "count": 1,
+                },
+            }
+        )
+
     resource_claim = {
         "apiVersion": f"{DRA_API_GROUP}/{get_dra_api_version()}",
         "kind": "ResourceClaim",
         "metadata": {"name": name, "namespace": namespace},
         "spec": {
-            "resourceClassName": resource_class,
-            "allocationMode": allocation_mode,
+            "devices": {
+                "requests": device_requests,
+            },
         },
     }
+
+    # Log the actual spec for debugging
+    Logger.debug(
+        f"Creating ResourceClaim with spec:\n{json.dumps(resource_claim, indent=2)}"
+    )
 
     # Use existing k8_util helper for creating custom resources
     ret_code, stdout, stderr = k8_util.k8_create_custom_resource(resource_claim)
     if ret_code == 0:
-        Logger.info(f"Created ResourceClaim: {name} in namespace {namespace}")
+        Logger.info(
+            f"Created ResourceClaim: {name} requesting {device_count} GPU(s) in namespace {namespace}"
+        )
     else:
         Logger.error(f"Failed to create ResourceClaim {name}: {stderr}")
+        Logger.error(f"ResourceClaim spec was:\n{json.dumps(resource_claim, indent=2)}")
     return ret_code, stdout, stderr
 
 
@@ -640,7 +777,7 @@ def create_pod_with_resource_claim(
             "resourceClaims": [
                 {
                     "name": "gpu-claim",
-                    "source": {"resourceClaimName": resource_claim_name},
+                    "resourceClaimName": resource_claim_name,
                 }
             ],
             "containers": [
@@ -654,12 +791,15 @@ def create_pod_with_resource_claim(
         },
     }
 
+    # Log the actual spec for debugging
+    Logger.debug(f"Creating Pod with spec:\n{json.dumps(pod_spec, indent=2)}")
+
     try:
         v1 = client.CoreV1Api()
         result = v1.create_namespaced_pod(namespace=namespace, body=pod_spec)
         Logger.info(f"Created Pod {pod_name} with ResourceClaim {resource_claim_name}")
 
-        # Optionally wait for pod to be running using k8_util method
+        # Optionally wait for pod to be running
         if wait_for_running:
             ret_code = k8_util.k8_check_pod_running(
                 namespace=namespace,
@@ -672,8 +812,10 @@ def create_pod_with_resource_claim(
                 return ret_code, "", "Pod failed to reach Running state"
 
         return 0, json.dumps(result.to_dict(), default=str), ""
+
     except ApiException as e:
         Logger.error(f"Failed to create Pod {pod_name}: {e}")
+        Logger.error(f"Pod spec was:\n{json.dumps(pod_spec, indent=2)}")
         return -1, "", str(e)
 
 
