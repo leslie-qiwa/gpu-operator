@@ -34,5 +34,32 @@ trap '
   fi
 ' EXIT
 
-# Run the e2e tests
-CI_ENV=1 SIM_ENABLE=1 make -C tests/e2e/
+# Run the e2e tests, capturing output for skip analysis
+set +e
+E2E_LOG=$(mktemp /tmp/e2e-output.XXXXXX)
+CI_ENV=1 SIM_ENABLE=1 make -C tests/e2e/ 2>&1 | tee "$E2E_LOG"
+E2E_EXIT=${PIPESTATUS[0]}
+set -e
+
+# Print summary table of skipped tests
+echo ""
+echo "========================================"
+echo "       SKIPPED TESTS SUMMARY"
+echo "========================================"
+SKIPPED=$(grep -oP 'SKIPPED_TEST: \K[^"]*' "$E2E_LOG" || true)
+if [ -n "$SKIPPED" ]; then
+  printf "%-55s | %s\n" "TEST" "REASON"
+  printf "%-55s-|-%s\n" "$(printf '%0.s-' {1..55})" "$(printf '%0.s-' {1..50})"
+  echo "$SKIPPED" | while IFS='|' read -r test_name reason; do
+    test_name=$(echo "$test_name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    reason=$(echo "$reason" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    printf "%-55s | %s\n" "$test_name" "$reason"
+  done
+else
+  echo "(no tests were skipped)"
+fi
+echo "========================================"
+echo ""
+
+rm -f "$E2E_LOG"
+exit $E2E_EXIT
