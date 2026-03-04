@@ -5,23 +5,24 @@ metadata:
 data:
   LOG_STORE_NODE_NAME: ""               # Specify a candidate node name to store logs for easier access, or leave empty to let the system pick one of the candidate nodes
   JOB_NAME: cluster-validation-mpi-job  # Must match MPIJob metadata.name
-  WORKER_REPLICAS: "2"                  # Number of Worker Pods in each MPIJob doing actual computation
-  LAUNCHER_REPLICAS: "1"                # Number of Launcher Pods for the MPIJob, which coordinates workers
-  SLOTS_PER_WORKER: "8"                 # MPI ranks per Worker pod
-  GPU_PER_WORKER: "8"                   # Number of GPUs to request per Worker pod
-  PF_NIC_PER_WORKER: "0"                # Number of PF-NICs to request per Worker pod
-  VF_NIC_PER_WORKER: "8"                # Number of VF-NICs to request per Worker pod
-  NODE_VALIDATION_INTERVAL_MINS: "10"   # minimum interval in minutes between cluster validation runs on a given worker node
+  WORKER_REPLICAS: "__WORKER_REPLICAS__"                  # Number of Worker Pods in each MPIJob doing actual computation
+  LAUNCHER_REPLICAS: "__LAUNCHER_REPLICAS__"                # Number of Launcher Pods for the MPIJob, which coordinates workers
+  SLOTS_PER_WORKER: "__SLOTS_PER_WORKER__"                 # MPI ranks per Worker pod
+  GPU_PER_WORKER: "__GPU_PER_WORKER__"                   # Number of GPUs to request per Worker pod
+  PF_NIC_PER_WORKER: "__PF_NIC_PER_WORKER__"                # Number of PF-NICs to request per Worker pod
+  VF_NIC_PER_WORKER: "__VF_NIC_PER_WORKER__"                # Number of VF-NICs to request per Worker pod
+  NODE_VALIDATION_INTERVAL_MINS: "__NODE_VALIDATION_INTERVAL_MINS__"   # minimum interval in minutes between cluster validation runs on a given worker node
   PF_NIC_NAD_NAME: "amd-host-device-nad"
   VF_NIC_NAD_NAME: "vf-amd-host-device-nad"
 
   # === Node Selection Labels for candidates ===
   # NOTE:
+  # The entire list below can be customized via config.json["cluster-validation-framework"]["node-selector-labels"]
+  # Default: Select nodes with feature.node.kubernetes.io/amd-gpu=true and feature.node.kubernetes.io/amd-nic=true
   # For virtual function (VF) based GPU in a VM, use amd-vgpu=true instead of amd-gpu=true
   # For virtual function (VF) based NIC in a VM, use amd-vnic=true instead of amd-nic=true
   NODE_SELECTOR_LABELS: |
-    - feature.node.kubernetes.io/amd-gpu=true
-    - feature.node.kubernetes.io/amd-vnic=true
+    __NODE_SELECTOR_LABELS__
   CANDIDATE_LABEL: "amd.com/cluster-validation-candidate=true"
   SUCCESS_LABEL: "amd.com/cluster-validation-status=passed"
   FAILURE_LABEL: "amd.com/cluster-validation-status=failed"
@@ -75,10 +76,11 @@ data:
     export CHECK_ITER_COUNT="0"
 
   # === GPU Validation Tests Definitions ===
-  # RVS: ROCm Validation Suite. For a full list of supported recipes and arguments, refer to https://instinct.docs.amd.com/projects/gpu-operator/en/latest/test/appendix-test-recipe.html  
+  # RVS: ROCm Validation Suite. For a full list of supported recipes and arguments, refer to https://instinct.docs.amd.com/projects/gpu-operator/en/latest/test/appendix-test-recipe.html
   # AGFHC: AMD GPU Field Health Check. For a full list of supported recipes and arguments, refer to https://instinct.docs.amd.com/projects/gpu-operator/en/latest/test/agfhc.html
   # Refer to the above links for other available test frameworks and recipes, and configure the wait time accordingly.
-  SKIP_GPU_VALIDATION: "false" # Set to "true" to skip GPU validation tests, directly start the RCCL tests
+  SKIP_GPU_VALIDATION: "__SKIP_GPU_VALIDATION__" # Set to "true" to skip GPU validation tests, directly start the RCCL tests
+  SKIP_RCCL_TEST: "__SKIP_RCCL_TEST__" # Set to "true" to skip MPI Job RCCL tests
   TEST_RUNNER_JOB_WAIT_TIME: "1200"
   TEST_RUNNER_SUCCESS_LABEL: "amd.com/gpu-validation-test=passed"
   TEST_RUNNER_FAILURE_LABEL: "amd.com/gpu-validation-test=failed"

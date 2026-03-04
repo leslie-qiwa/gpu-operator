@@ -30,20 +30,100 @@ This project provides an automated, reproducible testing environment for GPU ope
    ./gpu-cluster.sh build
    ```
 
-2. **Start the validation cluster**
+   After building, you have two options to make the image available on all nodes:
+   - **Option A**: Save and port the image to other nodes:
+     ```bash
+     # On server node: save the image
+     docker save gpu-validation-cluster:latest -o gpu-validation-cluster.tar
+
+     # Transfer to worker nodes and load:
+     scp gpu-validation-cluster.tar user@worker-node:/tmp/
+     ssh user@worker-node "docker load -i /tmp/gpu-validation-cluster.tar"
+     ```
+   - **Option B**: Rebuild the image on each worker node:
+     ```bash
+     # Run on each worker node
+     ./gpu-cluster.sh build
+     ```
+
+2. **Configure cluster validation framework**
+
+   Before starting the cluster, edit `configs/config.json` to match your environment. Common configuration options:
+
+   **Device Type Selection:**
+   - For physical GPUs: `"gpu-type": "amd-gpu"`
+   - For SR-IOV VF GPUs (in VMs): `"gpu-type": "amd-vgpu"`
+   - For physical NICs: `"nic-type": "amd-nic"`
+   - For virtual NICs (in VMs): `"nic-type": "amd-vnic"`
+
+   **Resource Configuration:**
+   ```json
+   "cluster-validation-framework": {
+     "node-selector-labels": [      // Node selector labels for candidate selection
+       "feature.node.kubernetes.io/amd-gpu=true",  // GPU label selector
+       "feature.node.kubernetes.io/amd-nic=true"   // NIC label selector
+     ],
+     "resources": {
+       "worker-replicas": 2,        // Number of nodes to validate in parallel
+       "gpu-per-worker": 8,         // Number of GPUs per node
+       "pf-nic-per-worker": 0,      // Number of physical function NICs per node
+       "vf-nic-per-worker": 8,      // Number of virtual function NICs per node
+       "slots-per-worker": 8,       // MPI ranks per worker
+       "node-validation-interval-mins": 10  // Minimum interval between validation runs on same node
+     },
+     "skip-tests": {
+       "skip-gpu-validation": false,  // Set to true to skip GPU validation tests (RVS/AGFHC)
+       "skip-rccl-test": false         // Set to true to skip MPI Job RCCL tests
+     }
+   }
+   ```
+
+   **Node Selector Labels:**
+   The `node-selector-labels` array defines which nodes are eligible for cluster validation. Each label is combined with AND logic to select nodes.
+
+   Common label combinations:
+   - Physical GPUs + Physical NICs: `["feature.node.kubernetes.io/amd-gpu=true", "feature.node.kubernetes.io/amd-nic=true"]`
+   - Virtual GPUs + Virtual NICs (in VMs): `["feature.node.kubernetes.io/amd-vgpu=true", "feature.node.kubernetes.io/amd-vnic=true"]`
+   - Mixed configurations: Customize the array to match your environment
+
+3. **Start the validation cluster**
 
    ```bash
-   # Bring up control plane
-   ./gpu-cluster.sh run server
+   # Bring up control plane (run in background)
+   ./gpu-cluster.sh run server &
 
    # Fetch control plane token to join the cluster
    ./gpu-cluster.sh get-token
 
-   # On other nodes, bring up worker to join the cluster
-   ./gpu-cluster.sh run agent <server-ip> <token>
+   # On other nodes, bring up workers to join the cluster (run in background)
+   ./gpu-cluster.sh run agent <server-ip> <token> &
    ```
 
-3. **Tear down the cluster**
+4. **Verify cluster status**
+
+   After bringing up the cluster, login to the server container to check cluster status:
+
+   ```bash
+   # Login to server container
+   docker exec -it server bash
+
+   # Check all nodes are ready
+   kubectl get nodes
+
+   # Check all pods are running
+   kubectl get pods -A
+
+   # Exit container
+   exit
+
+   # Check cluster validation framework status
+   ./gpu-cluster.sh status
+
+   # Check per-node validation results
+   ./gpu-cluster.sh node-status
+   ```
+
+5. **Tear down the cluster**
 
    ```bash
    ./gpu-cluster.sh teardown

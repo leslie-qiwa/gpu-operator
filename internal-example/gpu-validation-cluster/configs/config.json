@@ -38,6 +38,26 @@
     "install-cvf": true,
     "mpi-operator": {
       "version": "v0.4.0"
+    },
+    "cronjob": {
+      "schedule": "*/10 * * * *"
+    },
+    "node-selector-labels": [
+      "feature.node.kubernetes.io/amd-gpu=true",
+      "feature.node.kubernetes.io/amd-nic=true"
+    ],
+    "resources": {
+      "worker-replicas": 2,
+      "launcher-replicas": 1,
+      "slots-per-worker": 8,
+      "gpu-per-worker": 8,
+      "pf-nic-per-worker": 0,
+      "vf-nic-per-worker": 8,
+      "node-validation-interval-mins": 10
+    },
+    "skip-tests": {
+      "skip-gpu-validation": false,
+      "skip-rccl-test": false
     }
   }
 }

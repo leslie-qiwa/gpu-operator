@@ -300,9 +300,9 @@ kind: CronJob
 metadata:
   name: cluster-validation-cron-job
 spec:
-  # schedule: "0 0 * * *"  
+  # schedule: "0 0 * * *"
   # schedule every 10 minutes (Change as needed)
-  schedule: "*/10 * * * *"                               # <-update before deploy
+  schedule: "__CRONJOB_SCHEDULE__"
   concurrencyPolicy: Forbid                             # Dont overlap runs    
   jobTemplate:
     spec:
@@ -350,6 +350,30 @@ spec:
                   source /tmp/gpu-validation-test.sh
 
                   echo -e "\n$(date): ===Step 3: Submitting MPIJob==="
+
+                  # Check if RCCL test should be skipped
+                  if [[ "${SKIP_RCCL_TEST,,}" == "true" ]]; then
+                    echo "SKIP_RCCL_TEST is set to true. Skipping MPI Job RCCL test."
+                    echo "=================================================================="
+
+                    # Label passed nodes with success status and remove candidate label
+                    CLUSTER_VALIDATION_STATUS_LABEL=${SUCCESS_LABEL}
+                    echo -e "\n$(date): ===Labeling nodes (RCCL test skipped)==="
+                    for n in $passed_nodes; do
+                      echo "Labeling node $n with $CLUSTER_VALIDATION_STATUS_LABEL"
+                      kubectl label node "$n" "$CLUSTER_VALIDATION_STATUS_LABEL" --overwrite
+                    done
+                    CANDIDATE_LABEL_KEY=${CANDIDATE_LABEL%%=*}
+                    for n in $passed_nodes; do
+                      echo "Removing candidate label on node: $n"
+                      kubectl label node "$n" "${CANDIDATE_LABEL_KEY}-" --overwrite
+                    done
+                    echo "[CronJob Result: $CLUSTER_VALIDATION_STATUS_LABEL] Cluster Validation Status updated on Candidate Nodes (RCCL test skipped)"
+                    echo "=================================================================="
+                    echo "[CronJob Completed] $(date)"
+                    exit 0
+                  fi
+
                   ts=$(date +%Y%m%d-%H%M)
                   new_job="cluster-validation-mpi-job-${ts}"
                   # Calculate worker replicas based on passed nodes count

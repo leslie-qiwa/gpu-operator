@@ -70,7 +70,9 @@ cmd_run() {
     # Check if image exists locally
     if ! docker image inspect "$FULL_IMAGE" &>/dev/null; then
         echo "[ERROR] Docker image not found locally: $FULL_IMAGE"
-        echo "[INFO] Please run: $0 build"
+        echo "[INFO] You can either:"
+        echo "[INFO]   - Build the image locally: $0 build"
+        echo "[INFO]   - Load the image from another node: docker load -i <image-tar-file>"
         exit 1
     fi
     
@@ -712,18 +714,72 @@ EOF
         if [ "$MODE" != "server" ] || [ "$INSTALL_CVF" != "true" ]; then
             return
         fi
+
         echo "[INFO] Installing Cluster Validation Framework..."
+
+        # Read configuration values with defaults
+        local CRONJOB_SCHEDULE=$(read_config '.["cluster-validation-framework"].cronjob.schedule // "*/10 * * * *"')
+        local WORKER_REPLICAS=$(read_config '.["cluster-validation-framework"].resources["worker-replicas"] // 2')
+        local LAUNCHER_REPLICAS=$(read_config '.["cluster-validation-framework"].resources["launcher-replicas"] // 1')
+        local SLOTS_PER_WORKER=$(read_config '.["cluster-validation-framework"].resources["slots-per-worker"] // 8')
+        local GPU_PER_WORKER=$(read_config '.["cluster-validation-framework"].resources["gpu-per-worker"] // 8')
+        local PF_NIC_PER_WORKER=$(read_config '.["cluster-validation-framework"].resources["pf-nic-per-worker"] // 0')
+        local VF_NIC_PER_WORKER=$(read_config '.["cluster-validation-framework"].resources["vf-nic-per-worker"] // 8')
+        local NODE_VALIDATION_INTERVAL=$(read_config '.["cluster-validation-framework"].resources["node-validation-interval-mins"] // 10')
+        local SKIP_GPU_VALIDATION=$(read_config '.["cluster-validation-framework"]["skip-tests"]["skip-gpu-validation"] // false')
+        local SKIP_RCCL_TEST=$(read_config '.["cluster-validation-framework"]["skip-tests"]["skip-rccl-test"] // false')
+
+        # Read node selector labels with default values
+        local NODE_SELECTOR_LABELS=$(read_config '.["cluster-validation-framework"]["node-selector-labels"] // ["feature.node.kubernetes.io/amd-gpu=true", "feature.node.kubernetes.io/amd-nic=true"]')
+        # Convert JSON array to YAML list format (no leading spaces, placeholder already indented)
+        local NODE_SELECTOR_LABELS_YAML=$(echo "$NODE_SELECTOR_LABELS" | jq -r '.[] | "- " + .')
+
+        echo "[INFO]   CronJob Schedule: $CRONJOB_SCHEDULE"
+        echo "[INFO]   Node Selector Labels: $(echo "$NODE_SELECTOR_LABELS" | jq -r 'join(", ")')"
+        echo "[INFO]   Resources - Workers: $WORKER_REPLICAS, GPUs/Worker: $GPU_PER_WORKER"
+        echo "[INFO]   Skip GPU Validation: $SKIP_GPU_VALIDATION, Skip RCCL Test: $SKIP_RCCL_TEST"
+
+        # Install MPI Operator
         echo "[INFO] Installing MPI Operator..."
         local MPI_OPERATOR_VERSION=$(read_config '.["cluster-validation-framework"]["mpi-operator"].version')
         docker exec "$CONTAINER_NAME" kubectl apply --server-side -f https://raw.githubusercontent.com/kubeflow/mpi-operator/$MPI_OPERATOR_VERSION/deploy/v2beta1/mpi-operator.yaml
         echo "[INFO] MPI Operator installation completed"
-        echo "[INFO] Posting Validation Framework manifests..."
-        docker exec "$CONTAINER_NAME" kubectl apply -f /configs/cluster-validation-config.yaml
-        docker exec "$CONTAINER_NAME" kubectl apply -f /configs/cluster-validation-job.yaml
+
+        # Apply cluster-validation-config.yaml with substitutions
+        echo "[INFO] Applying Cluster Validation ConfigMap..."
+        # Do substitutions in outer shell where variables are accessible, then pipe to kubectl
+        docker exec "$CONTAINER_NAME" cat /configs/cluster-validation-config.yaml | \
+            sed "s|__NODE_SELECTOR_LABELS__|${NODE_SELECTOR_LABELS_YAML}|g" | \
+            sed "s|__WORKER_REPLICAS__|${WORKER_REPLICAS}|g; \
+                 s|__LAUNCHER_REPLICAS__|${LAUNCHER_REPLICAS}|g; \
+                 s|__SLOTS_PER_WORKER__|${SLOTS_PER_WORKER}|g; \
+                 s|__GPU_PER_WORKER__|${GPU_PER_WORKER}|g; \
+                 s|__PF_NIC_PER_WORKER__|${PF_NIC_PER_WORKER}|g; \
+                 s|__VF_NIC_PER_WORKER__|${VF_NIC_PER_WORKER}|g; \
+                 s|__NODE_VALIDATION_INTERVAL_MINS__|${NODE_VALIDATION_INTERVAL}|g; \
+                 s|__SKIP_GPU_VALIDATION__|${SKIP_GPU_VALIDATION}|g; \
+                 s|__SKIP_RCCL_TEST__|${SKIP_RCCL_TEST}|g" | \
+            docker exec -i "$CONTAINER_NAME" kubectl apply -f -
+
+        # Apply cluster-validation-job.yaml with substitutions
+        echo "[INFO] Applying Cluster Validation CronJob..."
+        docker exec "$CONTAINER_NAME" sh -c "cat /configs/cluster-validation-job.yaml | \
+            sed 's|__CRONJOB_SCHEDULE__|'\"${CRONJOB_SCHEDULE}\"'|g' | \
+            kubectl apply -f -"
+
         echo "[INFO] Cluster Validation Framework installation completed"
     }
 
-    echo "[INFO] Running: docker run ${DOCKER_OPTS[@]} $FULL_IMAGE"
+    # Print sanitized command without exposing sensitive information
+    if [ "$MODE" = "agent" ]; then
+        echo "[INFO] Starting k3s agent container with masked credentials..."
+        echo "[INFO]   Container: $CONTAINER_NAME"
+        echo "[INFO]   Server IP: $K3S_IP"
+        echo "[INFO]   Token: [MASKED]"
+        echo "[INFO]   Registry Config: [MASKED]"
+    else
+        echo "[INFO] Starting k3s server container: $CONTAINER_NAME"
+    fi
     docker run "${DOCKER_OPTS[@]}" "$FULL_IMAGE" &
     CONTAINER_PID=$!
 
@@ -753,7 +809,10 @@ EOF
     fi
 
     echo "[INFO] Node Bringup completed successfully"
-    echo "[INFO] Waiting for container to finish..."
+    echo "[INFO] Container is now running. You can:"
+    echo "[INFO]   - Login to container: docker exec -it $CONTAINER_NAME bash"
+    echo "[INFO]   - Check status: $0 status"
+    echo "[INFO]   - View node status: $0 node-status"
     wait $CONTAINER_PID
 }
 
