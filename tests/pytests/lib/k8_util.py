@@ -850,7 +850,7 @@ def k8_get_deployment(namespace, deployment_name):
         return deployment
     except client.ApiException as e:
         if e.status == 404:
-            Logger.error(f"Error: Deployment '{deployment_name}' not found in namespace '{namespace}'.")
+            Logger.info(f"Error: Deployment '{deployment_name}' not found in namespace '{namespace}'.")
         else:
             Logger.error(f"Error fetching deployment status: {e}")
         assert True, f"Error fetching Deployment: {e}"
@@ -1989,7 +1989,7 @@ def k8_get_deviceconfigs_info(namespace : str, deviceconfig_name : str = None) -
     return ret_values
 
 @log_arguments
-def k8_lookup_crd(crd_name : str) -> Dict:
+def k8_get_crd(crd_name : str) -> Dict:
     """
     API to retrieve DeviceConfig CRD information post gpu-operator installation
 
@@ -2016,6 +2016,35 @@ def k8_lookup_crd(crd_name : str) -> Dict:
             return crd
     Logger.debug(f"CRDs from the cluster\n{LogPrettyPrinter.pformat(crd_list)}")
     return None
+
+@log_arguments
+def k8_check_crds(crd_names : List[str]) -> List[str]: 
+    """
+    API to check the presence of specific GPU-operator CRDs.
+
+    Parameters:
+        crd_names (List[str]): list of CRD names to verify.
+
+    Returns:
+        List[str]: list of names of any CRDs that were not found
+    """
+
+    global Logger    
+    api = client.ApiextensionsV1Api()
+
+    try:
+        crd_list = api.list_custom_resource_definition()
+        existing_crds_names = {item.metadata.name for item in crd_list.items}
+    except ApiException as e:
+        Logger.error(f"Error retrieving CRDs from cluster, error: {e}")
+        return None
+
+    missing_crds = [name for name in crd_names if name not in existing_crds_names]
+    if missing_crds:
+        Logger.warning(f"CRD not found: '{missing_crds}'")
+        return  missing_crds
+
+    return  missing_crds
 
 @log_arguments
 def k8_run_curl_cmd(k8_cluster : common.k8_cluster, args : List, retry = 10) -> (int, int, str):

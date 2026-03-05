@@ -217,7 +217,7 @@ def test_gpu_operator_check_all_pods(gpu_cluster, gpu_operator_release_name, gpu
 def test_gpu_operator_check_deviceconfig_crd(gpu_cluster, gpu_operator_install, environment):
     global Logger
 
-    deviceconfig_crd = k8_util.k8_lookup_crd("deviceconfigs.amd.com")
+    deviceconfig_crd = k8_util.k8_get_crd("deviceconfigs.amd.com")
     K8Helper.triage(environment, deviceconfig_crd != None, f"Missing deviceconfigs.amd.com CRD post gpu-operator installation")
 
     # Check metadata
@@ -293,7 +293,7 @@ def test_gpu_operator_uninstall(request, gpu_cluster, images, gpu_operator_relea
     if environment.gpu_operator_version in ['v1.0.0', 'v1.1.0']:
         Logger.debug('Skipping checking of deviceconfigs.amd.com CRD cleanup for gpu-operator chart version v1.0.0 and v1.1.0')
     else:
-        deviceconfig_crd = k8_util.k8_lookup_crd("deviceconfigs.amd.com")
+        deviceconfig_crd = k8_util.k8_get_crd("deviceconfigs.amd.com")
         K8Helper.triage(environment, (deviceconfig_crd is None),
                         f"CRD deviceconfigs.amd.com still found post gpu-operator uninstallation")
     time.sleep(30)

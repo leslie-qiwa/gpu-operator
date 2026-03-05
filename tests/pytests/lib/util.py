@@ -637,7 +637,7 @@ class K8Helper:
             if  K8Helper.is_unhealthy_pod(full_pod_info):
                 unhealthy_pods.append(full_pod_info)
 
-        if unhealthy_pods:
+        if unhealthy_pods and hasattr(environment, 'context') :
             setattr(environment.context, 'unhealthy_pods', unhealthy_pods )
             K8Helper.triage(environment, False, f"Daemonset rollout failed in '{namespace}': {len(unhealthy_pods)} pods are unhealthy.")
 
