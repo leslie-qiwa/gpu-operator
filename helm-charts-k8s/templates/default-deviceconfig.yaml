@@ -179,6 +179,10 @@ spec:
     upgradePolicy:
       {{- toYaml . | nindent 6 }}
     {{- end }}
+
+    {{- with .kubeletSocketPath }}
+    kubeletSocketPath: {{ . }}
+    {{- end }}
   {{- end }}
 
   {{- with .Values.deviceConfig.spec.metricsExporter }}
