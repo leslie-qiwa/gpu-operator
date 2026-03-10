@@ -38,7 +38,7 @@ import lib.amdgpu as amdgpu_util
 Logger = logging.getLogger("lib.node_gpu_collector")
 
 
-def collect_gpu_hardware_info(k8_cluster, node_name: str) -> Dict:
+def collect_gpu_hardware_info_by_lspci(k8_cluster, node_name: str) -> Dict:
     """
     Collect GPU hardware information using lspci.
 
@@ -59,12 +59,10 @@ def collect_gpu_hardware_info(k8_cluster, node_name: str) -> Dict:
                     "description": "...",
                     "full_line": "..."
                 }
-            ],
-            "device_ids": ["74a1"],
-            "total_gpus": 8
+            ]
         }
     """
-    hardware_info = {"gpus": [], "device_ids": set(), "total_gpus": 0}
+    hardware_info = {"gpus": []}
 
     # Run lspci to find AMD devices (vendor ID 1002)
     # This is exactly what gather_device_info does
@@ -125,9 +123,6 @@ def collect_gpu_hardware_info(k8_cluster, node_name: str) -> Dict:
                         "full_line": line.strip(),
                     }
                 )
-
-                hardware_info["device_ids"].add(device_id)
-                hardware_info["total_gpus"] += 1
         else:
             # Fallback to simple pattern (gather_device_info pattern)
             match = re.search(pattern, line)
@@ -143,69 +138,284 @@ def collect_gpu_hardware_info(k8_cluster, node_name: str) -> Dict:
                     }
                 )
 
-                hardware_info["device_ids"].add(device_id)
-                hardware_info["total_gpus"] += 1
-
-    hardware_info["device_ids"] = list(hardware_info["device_ids"])
-
-    Logger.info(f"Node {node_name}: Found {hardware_info['total_gpus']} AMD GPU(s)")
+    Logger.info(f"Node {node_name}: Found {len(hardware_info['gpus'])} AMD GPU(s)")
 
     return hardware_info
 
 
-def collect_gpu_partition_profiles(k8_cluster, node_name: str) -> List[str]:
+def collect_gpu_hardware_info_by_sysfs(k8_cluster, node_name: str) -> Dict:
     """
-    Collect GPU partition profiles from sysfs.
+    Collect GPU hardware information from sysfs for each PCI device.
+
+    Reads from /sys/module/amdgpu/drivers/pci:amdgpu/<pci_addr>/ for each GPU.
+    Collects partition configuration attributes.
+
+    Optimized to use a single run_command_on_node call instead of multiple calls.
 
     Args:
         k8_cluster: K8 cluster object
         node_name: Name of the node
 
     Returns:
-        List of partition profile strings (e.g., ["spx_8gb", "spx_16gb"])
+        Dict with GPU information organized by PCI address:
+        {
+            "gpus": {
+                "0000:06:00.0": {
+                    "pci_address": "0000:06:00.0",
+                    "available_compute_partition": "SPX, DPX, QPX, CPX",
+                    "available_memory_partition": "NPS1, NPS2",
+                    "current_compute_partition": "SPX",
+                    "current_memory_partition": "NPS1",
+                    ...
+                }
+            }
+        }
     """
-    partition_profiles = []
+    Logger.info(f"Collecting GPU sysfs information for node: {node_name}")
+    sysfs_info = {"gpus": {}}
 
-    # Find partition profile files
-    cmd = ["find", "/sys/class/drm", "-name", "partition_profile", "-type", "f"]
+    # List of sysfs attributes to collect for each GPU
+    attributes_to_read = [
+        "available_compute_partition",
+        "available_memory_partition",
+        "current_compute_partition",
+        "current_memory_partition",
+        "device",
+        "vendor",
+        "product_name",
+        "product_number",
+        "serial_number",
+        "vbios_version",
+    ]
+
+    Logger.debug(f"Attributes to collect per GPU: {', '.join(attributes_to_read)}")
+    Logger.debug(
+        "Also collecting: cardIndex, renderIndex, driverVersion, driverSrcVersion"
+    )
+
+    # Build a single shell script that collects all data in one execution
+    # This reduces the number of pod creations from 1+(N*10) to just 1
+    # Output format: PCI_ADDR|attr1|value1|attr2|value2|...
+    Logger.info("Building optimized sysfs collection script (single pod execution)")
+    script = f"""
+    set -e
+    base_dir="/sys/module/amdgpu/drivers/pci:amdgpu"
+
+    if [ ! -d "$base_dir" ]; then
+        echo "ERROR: Directory $base_dir not found"
+        exit 1
+    fi
+
+    cd "$base_dir"
+
+    # Get driver version info (global, same for all GPUs)
+    driver_version=$(cat /sys/module/amdgpu/version 2>/dev/null || echo "")
+    driver_src_version=$(cat /sys/module/amdgpu/srcversion 2>/dev/null || echo "")
+
+    # Find all PCI addresses (format: 0000:06:00.0)
+    for pci_addr in $(ls -1 | grep -E '^[0-9a-fA-F]{{4}}:[0-9a-fA-F]{{2}}:[0-9a-fA-F]{{2}}\\.[0-9]$'); do
+        echo "GPU_START|$pci_addr"
+
+        # Read each attribute from PCI device directory
+        {' '.join([f'''
+        if [ -f "$pci_addr/{attr}" ]; then
+            value=$(cat "$pci_addr/{attr}" 2>/dev/null || echo "")
+            echo "ATTR|{attr}|$value"
+        else
+            echo "ATTR|{attr}|"
+        fi''' for attr in attributes_to_read])}
+
+        # Add driver version (same for all GPUs on this node)
+        echo "ATTR|driverVersion|$driver_version"
+        echo "ATTR|driverSrcVersion|$driver_src_version"
+
+        # Find cardIndex by matching PCI address in /sys/class/drm/cardX/device symlink
+        card_index=""
+        for drm_card in /sys/class/drm/card*; do
+            if [ -L "$drm_card/device" ]; then
+                card_pci=$(readlink -f "$drm_card/device" 2>/dev/null || echo "")
+                if [[ "$card_pci" == *"$pci_addr"* ]]; then
+                    card_index=$(basename "$drm_card" | sed 's/card//')
+                    break
+                fi
+            fi
+        done
+        echo "ATTR|cardIndex|$card_index"
+
+        # Find renderIndex by matching PCI address in /sys/class/drm/renderDX/device symlink
+        render_index=""
+        for drm_render in /sys/class/drm/renderD*; do
+            if [ -L "$drm_render/device" ]; then
+                render_pci=$(readlink -f "$drm_render/device" 2>/dev/null || echo "")
+                if [[ "$render_pci" == *"$pci_addr"* ]]; then
+                    render_index=$(basename "$drm_render" | sed 's/renderD//')
+                    break
+                fi
+            fi
+        done
+        echo "ATTR|renderIndex|$render_index"
+
+        echo "GPU_END|$pci_addr"
+    done
+    """
+
+    # Execute the script once
+    Logger.info(f"Executing sysfs collection on node {node_name}")
+    cmd = ["bash", "-c", script]
     result = k8_util.run_command_on_node(k8_cluster, node_name, cmd)
 
-    # Handle case where run_command_on_node returns None
     if result is None:
         Logger.error(
             f"run_command_on_node returned None for node {node_name} (all retries failed)"
         )
-        return partition_profiles
+        return sysfs_info
 
     ret_code, output = result
 
-    if ret_code != 0 or not output or not output.strip():
-        Logger.debug(f"Node {node_name}: No partition profile files found")
-        return partition_profiles
+    if ret_code != 0:
+        Logger.error(
+            f"Failed to collect sysfs data on node {node_name}: exit code {ret_code}"
+        )
+        Logger.debug(f"Output: {output}")
+        return sysfs_info
 
-    # Read each partition profile file
-    for part_file in output.strip().split("\n"):
-        if part_file.strip():
-            cmd = ["cat", part_file.strip()]
-            result = k8_util.run_command_on_node(k8_cluster, node_name, cmd)
+    if not output:
+        Logger.info(
+            f"Node {node_name} does not have any AMD GPU devices in amdgpu driver"
+        )
+        return sysfs_info
 
-            # Handle None return
-            if result is None:
-                Logger.warning(
-                    f"Failed to read partition file {part_file} on node {node_name}"
-                )
-                continue
+    # Parse the output
+    Logger.info(f"Parsing sysfs data from node {node_name}")
+    current_gpu = None
+    for line in output.strip().split("\n"):
+        line = line.strip()
+        if not line:
+            continue
 
-            ret_code, content = result
+        if line.startswith("GPU_START|"):
+            pci_addr = line.split("|", 1)[1]
+            current_gpu = {"pci_address": pci_addr}
+            Logger.debug(f"Processing GPU: {pci_addr}")
 
-            if ret_code == 0 and content and content.strip():
-                partition_profiles.append(content.strip())
+        elif line.startswith("ATTR|") and current_gpu is not None:
+            parts = line.split("|", 2)
+            if len(parts) == 3:
+                attr_name = parts[1]
+                attr_value = parts[2].strip() if parts[2] else None
+                current_gpu[attr_name] = attr_value
+
+        elif line.startswith("GPU_END|") and current_gpu is not None:
+            pci_addr = current_gpu["pci_address"]
+            sysfs_info["gpus"][pci_addr] = current_gpu
+            current_gpu = None
+
+        elif line.startswith("ERROR:"):
+            Logger.warning(f"Node {node_name}: {line}")
 
     Logger.info(
-        f"Node {node_name}: Found {len(partition_profiles)} partition profile(s): {partition_profiles}"
+        f"Node {node_name}: Collected sysfs info for {len(sysfs_info['gpus'])} GPU(s)"
     )
 
-    return partition_profiles
+    return sysfs_info
+
+
+def collect_gpu_hardware_info(k8_cluster, node_name: str) -> Dict:
+    """
+    Collect comprehensive GPU hardware information from both lspci and sysfs.
+
+    Combines data from:
+    1. lspci - PCI device detection, device IDs, GPU series
+    2. sysfs - Partition configuration, product info, versions
+
+    This is the main method that should be used by tests. It provides complete
+    GPU hardware information by merging both data sources based on PCI address.
+
+    Args:
+        k8_cluster: K8 cluster object
+        node_name: Name of the node
+
+    Returns:
+        Dict with merged hardware information:
+        {
+            "gpus": [  # merged list of GPUs
+                {
+                    "pci_address": "06:00.0",  # short format from lspci
+                    "pci_address_full": "0000:06:00.0",  # long format from sysfs
+                    "device_id": "74a1",  # from lspci
+                    "gpu_series": "MI300X",  # from lspci
+                    "current_compute_partition": "SPX",  # from sysfs
+                    "current_memory_partition": "NPS1",  # from sysfs
+                    "available_compute_partition": "SPX, DPX, QPX, CPX",  # from sysfs
+                    "available_memory_partition": "NPS1, NPS2",  # from sysfs
+                    "product_name": "...",  # from sysfs
+                    ...
+                }
+            ]
+        }
+
+        Use len(result["gpus"]) to get GPU count.
+        Use [gpu["device_id"] for gpu in result["gpus"]] to get device IDs.
+    """
+    # Collect from lspci
+    lspci_info = collect_gpu_hardware_info_by_lspci(k8_cluster, node_name)
+
+    # Collect from sysfs
+    sysfs_info = collect_gpu_hardware_info_by_sysfs(k8_cluster, node_name)
+
+    # Merge data based on PCI address
+    merged_gpus = []
+
+    for lspci_gpu in lspci_info.get("gpus", []):
+        # Get short PCI address from lspci (e.g., "06:00.0")
+        short_pci = lspci_gpu.get("pci_address", "")
+
+        # Convert short format to long format for sysfs lookup
+        # Short: "06:00.0" -> Long: "0000:06:00.0"
+        # Short: "0000:06:00.0" -> Long: "0000:06:00.0" (already long)
+        if short_pci:
+            if short_pci.count(":") == 1:
+                # Short format, add domain prefix
+                long_pci = f"0000:{short_pci}"
+            else:
+                # Already long format
+                long_pci = short_pci
+        else:
+            long_pci = None
+
+        # Start with lspci data
+        merged_gpu = lspci_gpu.copy()
+
+        # Merge sysfs data if available
+        if long_pci and long_pci in sysfs_info.get("gpus", {}):
+            sysfs_gpu = sysfs_info["gpus"][long_pci]
+            merged_gpu["pci_address_full"] = long_pci
+
+            # Add all sysfs attributes except pci_address (keep short format from lspci)
+            for key, value in sysfs_gpu.items():
+                if key != "pci_address":
+                    merged_gpu[key] = value
+
+            Logger.debug(
+                f"Merged data for PCI {short_pci}: lspci + sysfs ({len(sysfs_gpu)} sysfs attrs)"
+            )
+        else:
+            Logger.debug(
+                f"No sysfs data found for PCI address {short_pci} (tried {long_pci})"
+            )
+
+        merged_gpus.append(merged_gpu)
+
+    # Return merged results
+    combined_info = {
+        "gpus": merged_gpus,
+    }
+
+    Logger.info(
+        f"Node {node_name}: Combined hardware info - {len(combined_info['gpus'])} GPU(s) with merged lspci+sysfs data"
+    )
+
+    return combined_info
 
 
 def populate_cluster_node_with_gpu_info(k8_cluster, cluster_node, node_name: str):
@@ -224,33 +434,16 @@ def populate_cluster_node_with_gpu_info(k8_cluster, cluster_node, node_name: str
     hw_info = collect_gpu_hardware_info(k8_cluster, node_name)
 
     # Populate cluster_node (same as gather_device_info does)
-    if hw_info["total_gpus"] > 0:
+    if len(hw_info["gpus"]) > 0:
         # Use first GPU's info (same as gather_device_info)
         first_gpu = hw_info["gpus"][0]
         cluster_node.device_id = first_gpu["device_id"]
         cluster_node.gpu_series = first_gpu["gpu_series"]
-        cluster_node.num_gpus = hw_info["total_gpus"]
+        cluster_node.num_gpus = len(hw_info["gpus"])
     else:
         cluster_node.device_id = None
         cluster_node.gpu_series = None
         cluster_node.num_gpus = 0
-
-
-def extend_cluster_node_with_partition_info(k8_cluster, cluster_node, node_name: str):
-    """
-    Extend a cluster_node object with partition profile information.
-
-    This can be used to augment the data from gather_device_info.
-
-    Args:
-        k8_cluster: K8 cluster object
-        cluster_node: cluster_node object to extend
-        node_name: Name of the node
-    """
-    partition_profiles = collect_gpu_partition_profiles(k8_cluster, node_name)
-
-    # Add partition_profiles attribute to cluster_node
-    cluster_node.partition_profiles = partition_profiles
 
 
 def populate_all_cluster_nodes_with_gpu_info(k8_cluster):

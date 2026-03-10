@@ -2,10 +2,22 @@
 
 # Example usage script for collect_node_gpu_data.py
 #
+# Usage:
+#   ./collect_node_gpu_data.sh          # Use INFO log level (default)
+#   ./collect_node_gpu_data.sh --debug  # Use DEBUG log level
+#
 # Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
 # Licensed under the Apache License, Version 2.0
 
 set -e
+
+# Parse arguments
+DEBUG_FLAG=""
+if [[ "$1" == "--debug" ]]; then
+    DEBUG_FLAG="--debug"
+    echo "DEBUG mode enabled"
+    shift
+fi
 
 echo "==================================================================="
 echo "Node GPU Data Collection - Example Usage"
@@ -58,7 +70,8 @@ for node in $GPU_NODES; do
     output_file="$OUTPUT_DIR/${node}-gpu-data.json"
 
     # Run collection script from pytests directory
-    python3 scripts/collect_node_gpu_data.py "$node" --output "$output_file" --pretty
+    # Default: INFO log level, add --debug flag to enable DEBUG level
+    python3 scripts/collect_node_gpu_data.py "$node" --output "$output_file" --pretty $DEBUG_FLAG
 
     echo
     echo "✓ Data saved to: $output_file"
