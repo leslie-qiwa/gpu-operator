@@ -241,6 +241,11 @@ device_config_template_v1_3_0 = {
         'selector' : {
             'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
         },
+        'remediationWorkflow': { 
+            'autoStartWorkflow': True,
+            'enable': False,
+            'ttlForFailedWorkflows': '24h'
+        },
     },
 }
 
@@ -448,6 +453,11 @@ device_config_template_main = {
         },
         'selector' : {
             'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
+        },
+        'remediationWorkflow': { 
+            'autoStartWorkflow': True,
+            'enable': False,
+            'ttlForFailedWorkflows': '24h'
         },
     },
 }
@@ -794,6 +804,17 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
         device_config['spec']['selector'] = {
             spec.get('selector.field', 'feature.node.kubernetes.io/amd-gpu') : spec.get('selector.value', DQ('true')),
         }
+
+    # remediationWorkflow
+    if 'remediationWorkflow' in device_config['spec']:
+        device_config['spec']['remediationWorkflow'] = {}
+        if not skip_sections.get('remediationWorkflow', False):
+            device_config['spec']['remediationWorkflow']['enable'] = spec.get('remediationWorkflow.enable', False)
+            device_config['spec']['remediationWorkflow']['autoStartWorkflow'] = spec.get('remediationWorkflow.autoStartWorkflow', True)
+            device_config['spec']['remediationWorkflow']['ttlForFailedWorkflows'] = spec.get('remediationWorkflow.ttlForFailedWorkflows', '24h')
+        else:
+            del device_config['spec']['remediationWorkflow']
+
     return device_config
 
 def generate_helmchart_deployment_config(gpu_operator_version, images, file_name):

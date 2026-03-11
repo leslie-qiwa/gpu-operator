@@ -2488,3 +2488,37 @@ def k8_wait_for_cluster_ready(minikube : bool = False) -> (int):
     Logger.error(f"Some of the nodes of cluster failed to come online - fatal error")
     return -1
 
+@log_arguments
+def k8_get_configmap(namespace: str, configmap_name: str):
+    """
+    API to get a specific configmap in a k8-cluster
+    Equivalent to: kubectl get configmap <name> -n <ns>
+    """
+    global Logger
+    api = client.CoreV1Api()
+    try:
+        api_response = api.read_namespaced_config_map(configmap_name, namespace)
+        return 0, api_response, ""
+    except ApiException as e:
+        Logger.debug(f"Config-map {configmap_name} not found or error: {e}")
+        return -1, None, str(e)
+
+@log_arguments
+def k8_patch_node_status(node_name, status_body):
+    """
+    Patches the node status subresource.
+    """
+    global Logger
+    v1 = client.CoreV1Api()
+    try:
+        api_response = v1.patch_node_status(name=node_name, body=status_body)
+        Logger.info(f"Successfully patched status for node: {node_name}")
+        return 0, api_response, ""
+    except ApiException as e:
+        error_msg = f"K8s ApiException ({e.status}): {e.reason} - {e.body}"
+        Logger.debug(error_msg)
+        return e.status, None, error_msg
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        Logger.error(error_msg)
+        return -1, None, error_msg
