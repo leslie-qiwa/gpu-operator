@@ -36,7 +36,7 @@ metadata:
     capabilities: Seamless Upgrades
     categories: AI/Machine Learning,Monitoring
     containerImage: registry.test.pensando.io:5000/amd-gpu-operator:dev
-    createdAt: "2026-03-10T05:41:17Z"
+    createdAt: "2026-03-11T23:25:24Z"
     description: |-
       Operator responsible for deploying AMD GPU kernel drivers, device plugin, device test runner and device metrics exporter
       For more information, visit [documentation](https://instinct.docs.amd.com/projects/gpu-operator/en/latest/)
@@ -210,6 +210,12 @@ spec:
         path: devicePlugin.enableNodeLabeller
         x-descriptors:
         - urn:alm:descriptor:com.amd.deviceconfigs:enableNodeLabeller
+      - description: HostNetwork specifies whether to use host network namespace for
+          the device plugin DaemonSet pods.
+        displayName: HostNetwork
+        path: devicePlugin.hostNetwork
+        x-descriptors:
+        - urn:alm:descriptor:com.amd.deviceconfigs:hostNetwork
       - description: node labeller image registry secret used to pull/push images
         displayName: ImageRegistrySecret
         path: devicePlugin.imageRegistrySecret
@@ -572,6 +578,12 @@ spec:
         path: metricsExporter.enable
         x-descriptors:
         - urn:alm:descriptor:com.amd.deviceconfigs:enable
+      - description: HostNetwork specifies whether to use host network namespace for
+          the metrics exporter DaemonSet pods.
+        displayName: HostNetwork
+        path: metricsExporter.hostNetwork
+        x-descriptors:
+        - urn:alm:descriptor:com.amd.deviceconfigs:hostNetwork
       - description: metrics exporter image
         displayName: Image
         path: metricsExporter.image
