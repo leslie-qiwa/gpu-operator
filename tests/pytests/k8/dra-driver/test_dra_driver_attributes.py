@@ -551,97 +551,117 @@ def validate_partition_attributes(device, environment):
 
 
 def validate_device_identifiers_uniqueness(amd_devices, environment):
-    """Validate uniqueness of device identifiers across all devices
+    """Validate uniqueness of device identifiers per-node
 
     Validates that cardIndex, renderIndex, deviceID (for full GPUs), and pciAddr (for full GPUs)
-    are unique. Partitions can share deviceID and pciAddr with their parent GPU.
+    are unique within each node. Partitions can share deviceID and pciAddr with their parent GPU.
+
+    Note: cardIndex and renderIndex are node-local identifiers, so they only need to be unique
+    within the same node, not across the entire cluster.
     """
-    Logger.info("Validating uniqueness of device identifiers...")
+    Logger.info("Validating uniqueness of device identifiers per-node...")
 
-    # Maps: attribute_value -> device name (to detect duplicates immediately)
-    card_indices_map = {}
-    render_indices_map = {}
-    device_ids_map = {}
-    pci_addrs_map = {}
-
+    # Group devices by node
+    devices_by_node = {}
     for device in amd_devices:
-        attrs = device.get("attributes", {})
-        device_name = device.get("name", "")
-        device_type = device.get("type", "")
+        node_name = device.get("node_name", "unknown")
+        if node_name not in devices_by_node:
+            devices_by_node[node_name] = []
+        devices_by_node[node_name].append(device)
 
-        card_idx = attrs.get("cardIndex")
-        render_idx = attrs.get("renderIndex")
-        device_id = attrs.get("deviceID", "")
-        pci_addr = attrs.get("pciAddr", "")
+    Logger.info(f"Validating devices across {len(devices_by_node)} node(s)")
+    Logger.debug(f"Nodes found: {list(devices_by_node.keys())}")
+    for node_name, devices in devices_by_node.items():
+        Logger.debug(f"  Node '{node_name}': {len(devices)} device(s)")
 
-        # Check for duplicate cardIndex - must be unique
-        if card_idx is not None:
-            K8Helper.triage(
-                environment,
-                card_idx not in card_indices_map,
-                f"Duplicate cardIndex {card_idx}: already used by {card_indices_map.get(card_idx, 'unknown')}, found again on {device_name}",
-            )
-            card_indices_map[card_idx] = device_name
+    # Validate uniqueness within each node
+    for node_name, node_devices in devices_by_node.items():
+        Logger.info(f"Validating {len(node_devices)} device(s) on node: {node_name}")
 
-        # Check for duplicate renderIndex - must be unique
-        if render_idx is not None:
-            K8Helper.triage(
-                environment,
-                render_idx not in render_indices_map,
-                f"Duplicate renderIndex {render_idx}: already used by {render_indices_map.get(render_idx, 'unknown')}, found again on {device_name}",
-            )
-            render_indices_map[render_idx] = device_name
+        # Maps: attribute_value -> device name (to detect duplicates within node)
+        card_indices_map = {}
+        render_indices_map = {}
+        device_ids_map = {}
+        pci_addrs_map = {}
 
-        # Check for duplicate deviceID - only allowed for partitions (share parent GPU's ID)
-        if device_id:
-            if device_id in device_ids_map and device_type == "amdgpu":
+        for device in node_devices:
+            attrs = device.get("attributes", {})
+            device_name = device.get("name", "")
+            device_type = device.get("type", "")
+
+            card_idx = attrs.get("cardIndex")
+            render_idx = attrs.get("renderIndex")
+            device_id = attrs.get("deviceID", "")
+            pci_addr = attrs.get("pciAddr", "")
+
+            # Check for duplicate cardIndex - must be unique per node
+            if card_idx is not None:
                 K8Helper.triage(
                     environment,
-                    False,
-                    f"Duplicate deviceID {device_id} on full GPU: already used by {device_ids_map[device_id]}, found again on {device_name}",
+                    card_idx not in card_indices_map,
+                    f"Node {node_name}: Duplicate cardIndex {card_idx}: already used by {card_indices_map.get(card_idx, 'unknown')}, found again on {device_name}",
                 )
-            if device_id not in device_ids_map:
-                device_ids_map[device_id] = device_name
+                card_indices_map[card_idx] = device_name
 
-        # Check for duplicate pciAddr - only allowed for partitions (share parent GPU's PCI)
-        if pci_addr:
-            if pci_addr in pci_addrs_map and device_type == "amdgpu":
+            # Check for duplicate renderIndex - must be unique per node
+            if render_idx is not None:
                 K8Helper.triage(
                     environment,
-                    False,
-                    f"Duplicate pciAddr {pci_addr} on full GPU: already used by {pci_addrs_map[pci_addr]}, found again on {device_name}",
+                    render_idx not in render_indices_map,
+                    f"Node {node_name}: Duplicate renderIndex {render_idx}: already used by {render_indices_map.get(render_idx, 'unknown')}, found again on {device_name}",
                 )
-            if pci_addr not in pci_addrs_map:
-                pci_addrs_map[pci_addr] = device_name
+                render_indices_map[render_idx] = device_name
 
-        # Validate device naming convention: gpu-<cardIndex>-<renderIndex>
-        name_pattern = r"^gpu-\d+-\d+$"
-        K8Helper.triage(
-            environment,
-            re.match(name_pattern, device_name) is not None,
-            f"Device name '{device_name}' doesn't match pattern 'gpu-<cardIndex>-<renderIndex>'",
-        )
+            # Check for duplicate deviceID - only allowed for partitions (share parent GPU's ID)
+            if device_id:
+                if device_id in device_ids_map and device_type == "amdgpu":
+                    K8Helper.triage(
+                        environment,
+                        False,
+                        f"Node {node_name}: Duplicate deviceID {device_id} on full GPU: already used by {device_ids_map[device_id]}, found again on {device_name}",
+                    )
+                if device_id not in device_ids_map:
+                    device_ids_map[device_id] = device_name
 
-        # Verify name components match attributes
-        if re.match(name_pattern, device_name):
-            parts = device_name.split("-")
-            name_card_idx = int(parts[1])
-            name_render_idx = int(parts[2])
+            # Check for duplicate pciAddr - only allowed for partitions (share parent GPU's PCI)
+            if pci_addr:
+                if pci_addr in pci_addrs_map and device_type == "amdgpu":
+                    K8Helper.triage(
+                        environment,
+                        False,
+                        f"Node {node_name}: Duplicate pciAddr {pci_addr} on full GPU: already used by {pci_addrs_map[pci_addr]}, found again on {device_name}",
+                    )
+                if pci_addr not in pci_addrs_map:
+                    pci_addrs_map[pci_addr] = device_name
 
+            # Validate device naming convention: gpu-<cardIndex>-<renderIndex>
+            name_pattern = r"^gpu-\d+-\d+$"
             K8Helper.triage(
                 environment,
-                name_card_idx == card_idx,
-                f"Device {device_name}: cardIndex in name ({name_card_idx}) != attribute ({card_idx})",
+                re.match(name_pattern, device_name) is not None,
+                f"Node {node_name}: Device name '{device_name}' doesn't match pattern 'gpu-<cardIndex>-<renderIndex>'",
             )
 
-            K8Helper.triage(
-                environment,
-                name_render_idx == render_idx,
-                f"Device {device_name}: renderIndex in name ({name_render_idx}) != attribute ({render_idx})",
-            )
+            # Verify name components match attributes
+            if re.match(name_pattern, device_name):
+                parts = device_name.split("-")
+                name_card_idx = int(parts[1])
+                name_render_idx = int(parts[2])
+
+                K8Helper.triage(
+                    environment,
+                    name_card_idx == card_idx,
+                    f"Node {node_name}: Device {device_name}: cardIndex in name ({name_card_idx}) != attribute ({card_idx})",
+                )
+
+                K8Helper.triage(
+                    environment,
+                    name_render_idx == render_idx,
+                    f"Node {node_name}: Device {device_name}: renderIndex in name ({name_render_idx}) != attribute ({render_idx})",
+                )
 
     Logger.info(
-        "✓ All device identifiers are unique (or correctly shared for partitions)"
+        "✓ All device identifiers are unique per-node (or correctly shared for partitions)"
     )
     Logger.info("✓ All device names follow canonical naming convention")
 
