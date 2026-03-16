@@ -58,7 +58,7 @@ def deviceconfig_install(gpu_cluster, images, gpu_operator_install, environment)
             'metadata.namespace' : environment.gpu_operator_namespace,
             'driver.enable' : True,
             'driver.blacklist' : True,
-            'devicePlugin.enableNodeLabeller' : False,
+            'devicePlugin.enableNodeLabeller' : True,
             'metricsExporter.enable' : False,
             'testRunner.enable' : False,
         }
