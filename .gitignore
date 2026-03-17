@@ -18,3 +18,4 @@ __pycache__/
 tests/pytests/bin/
 tests/pytests/console.log
 tests/pytests/logs/
+tests/e2e/e2e-artifacts/*
