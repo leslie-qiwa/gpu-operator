@@ -3,22 +3,17 @@ version: 2.0
 builds:
   build-gpu-operator:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && make && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=latest make docker-build && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=latest make docker-save && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=latest make docker-build-utils && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=latest make docker-save-utils && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 IMAGE_TAG=$PROJECT_VERSION make bundle-build && \
-               IMAGE_NAME=amd-gpu-operator PROJECT_VERSION=v1.4.0 IMAGE_TAG=$PROJECT_VERSION make bundle-save && \
-               mv amd-gpu-operator-olm-bundle.tar.gz internal-gpu-operator-olm-bundle.tar.gz && \
-               DOCKER_REGISTRY=amdpsdo IMAGE_NAME=gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=$RELEASE make bundle-build && \
-               DOCKER_REGISTRY=amdpsdo IMAGE_NAME=gpu-operator PROJECT_VERSION=v1.4.0 HOURLY_TAG_LABEL=$RELEASE IMAGE_TAG=$RELEASE make bundle-save && \
-               mv gpu-operator-olm-bundle.tar.gz amdpsdo-gpu-operator-olm-bundle.tar.gz"]
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-build && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-save && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-build-utils && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-save-utils && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make bundle-build && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make bundle-save"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
-     - /gpu-operator/amd-gpu-operator-latest.tar.gz
-     - /gpu-operator/amd-gpu-operator-utils-latest.tar.gz
-     - /gpu-operator/internal-gpu-operator-olm-bundle.tar.gz
-     - /gpu-operator/amdpsdo-gpu-operator-olm-bundle.tar.gz
+     - /gpu-operator/gpu-operator.tar.gz
+     - /gpu-operator/gpu-operator-utils.tar.gz
+     - /gpu-operator/gpu-operator-olm-bundle.tar.gz
     repo-dependencies:
       /ws/builder/kernel-module-management:
         repository: https://github.com/pensando/kernel-module-management
@@ -26,17 +21,11 @@ builds:
 
   build-gpu-operator-k8s:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && make && \
-               mkdir -p build/charts && \
-               PROJECT_VERSION=v1.4.0 IMAGE_TAG=$PROJECT_VERSION KMM_IMAGE_TAG=$PROJECT_VERSION make helm && \
-               cp helm-charts-k8s/gpu-operator-helm-k8s-v1.4.0.tgz \
-                  build/charts/internal-gpu-operator-helm-k8s-v1.4.0.tgz && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator PROJECT_VERSION=v1.4.0 IMAGE_TAG=${RELEASE:-latest} KMM_IMAGE_TAG=$PROJECT_VERSION make helm && \
-               cp helm-charts-k8s/gpu-operator-helm-k8s-v1.4.0.tgz \
-                  build/charts/amdpsdo-gpu-operator-helm-k8s-v1.4.0.tgz"]
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
+               mv helm-charts-k8s/gpu-operator-helm-k8s.tgz gpu-operator-helm-k8s.tgz"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
-     - /gpu-operator/build/charts/internal-gpu-operator-helm-k8s-v1.4.0.tgz
-     - /gpu-operator/build/charts/amdpsdo-gpu-operator-helm-k8s-v1.4.0.tgz
+     - /gpu-operator/gpu-operator-helm-k8s.tgz
     repo-dependencies:
       /ws/builder/kernel-module-management:
         repository: https://github.com/pensando/kernel-module-management

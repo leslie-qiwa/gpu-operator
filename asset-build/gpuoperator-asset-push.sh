@@ -1,30 +1,12 @@
 #!/bin/bash
 
-PROJECT_VERSION=${PROJECT_VERSION:-v1.4.0}
-
-if [ -z $RELEASE ]
+if [ -z "${RELEASE:-}" ]
 then
   echo "RELEASE is not set, return"
-
-  if [ -z ${DOCKERHUB_TOKEN-} ]
-  then
-      echo "DOCKERHUB_TOKEN is not set"
-  else
-      echo "DOCKERHUB_TOKEN is set"
-  fi
-      
   exit 0
 fi
 
-tag_prefix="${RELEASE%-*}"
-
-if [ "$tag_prefix" == "main" ]; then
-  tag="latest"
-else
-  tag="$tag_prefix"
-fi
-
-echo "Copying gpu-operator artifacts and pushing docker image with tag:$tag"
+echo "Copying gpu-operator artifacts and pushing docker image with tag: v$RELEASE"
 
 setup_dir () {
     ls -al /gpu-operator/
@@ -33,72 +15,45 @@ setup_dir () {
 }
 
 copy_artifacts () {
-    # copy gpu-opertar container image
-    cp /gpu-operator/amd-gpu-operator-latest.tar.gz $BUNDLE_DIR/amd-gpu-operator-latest-$RELEASE.tar.gz
+    # copy gpu-operator container image
+    cp /gpu-operator/gpu-operator.tar.gz $BUNDLE_DIR/gpu-operator-$RELEASE.tar.gz
     # copy gpu-operator utils container image
-    cp /gpu-operator/amd-gpu-operator-utils-latest.tar.gz $BUNDLE_DIR/amd-gpu-operator-utils-latest-$RELEASE.tar.gz
-    # copy internal k8s helm package
-    cp /gpu-operator/build/charts/internal-gpu-operator-helm-k8s-$PROJECT_VERSION.tgz  $BUNDLE_DIR/internal-gpu-operator-helm-k8s-$PROJECT_VERSION-$RELEASE.tgz
-    # copy amdpsdo k8s helm package
-    cp /gpu-operator/build/charts/amdpsdo-gpu-operator-helm-k8s-$PROJECT_VERSION.tgz  $BUNDLE_DIR/amdpsdo-gpu-operator-helm-k8s-$PROJECT_VERSION-$RELEASE.tgz
+    cp /gpu-operator/gpu-operator-utils.tar.gz $BUNDLE_DIR/gpu-operator-utils-$RELEASE.tar.gz
+    # copy k8s helm package
+    cp /gpu-operator/gpu-operator-helm-k8s.tgz $BUNDLE_DIR/gpu-operator-helm-k8s-$RELEASE.tgz
     # copy gpu operator OLM bundle package
-    cp /gpu-operator/internal-gpu-operator-olm-bundle.tar.gz  $BUNDLE_DIR/internal-gpu-operator-olm-bundle-$RELEASE.tar.gz
-    # copy gpu operator OLM bundle package for amdpsdo repository
-    cp /gpu-operator/amdpsdo-gpu-operator-olm-bundle.tar.gz $BUNDLE_DIR/amdpsdo-gpu-operator-olm-bundle-$RELEASE.tar.gz
+    cp /gpu-operator/gpu-operator-olm-bundle.tar.gz $BUNDLE_DIR/gpu-operator-olm-bundle-$RELEASE.tar.gz
     # list the artifacts copied out
     ls -la $BUNDLE_DIR
 }
 
 docker_push () {
-    # push operator controller image to internal registry
-    docker load -i /gpu-operator/amd-gpu-operator-latest.tar.gz
-    docker inspect registry.test.pensando.io:5000/amd-gpu-operator:latest | grep "HOURLY"
-    docker tag registry.test.pensando.io:5000/amd-gpu-operator:latest registry.test.pensando.io:5000/amd-gpu-operator:$tag
-    docker push registry.test.pensando.io:5000/amd-gpu-operator:$tag
-    # push utils image to internal registry
-    docker load -i /gpu-operator/amd-gpu-operator-utils-latest.tar.gz
-    docker inspect registry.test.pensando.io:5000/amd-gpu-operator-utils:latest | grep "HOURLY"
-    docker tag registry.test.pensando.io:5000/amd-gpu-operator-utils:latest registry.test.pensando.io:5000/amd-gpu-operator-utils:$tag
-    docker push registry.test.pensando.io:5000/amd-gpu-operator-utils:$tag
-    # push OLM bundle image to internal registry
-    docker load -i /gpu-operator/internal-gpu-operator-olm-bundle.tar.gz
-    docker inspect registry.test.pensando.io:5000/amd-gpu-operator-bundle:$PROJECT_VERSION | grep "HOURLY"
-    docker tag registry.test.pensando.io:5000/amd-gpu-operator-bundle:$PROJECT_VERSION registry.test.pensando.io:5000/amd-gpu-operator-bundle:$tag
-    docker push registry.test.pensando.io:5000/amd-gpu-operator-bundle:$tag
-    # load amdpsdo OLM bundle image
-    docker load -i /gpu-operator/amdpsdo-gpu-operator-olm-bundle.tar.gz  
-    # push final release to docker hub for public access
-    if [ -z $DOCKERHUB_TOKEN ]
+    if [ -z "${DOCKERHUB_TOKEN:-}" ]
     then
-      echo "DOCKERHUB_TOKEN is not set"
-    else
-      docker login --username=shreyajmeraamd --password-stdin <<< $DOCKERHUB_TOKEN
-      docker tag registry.test.pensando.io:5000/amd-gpu-operator:$tag amdpsdo/gpu-operator:$tag
-      docker push amdpsdo/gpu-operator:$tag
-
-      # push with hourly release tag
-      docker tag registry.test.pensando.io:5000/amd-gpu-operator:$tag amdpsdo/gpu-operator:$RELEASE
-      docker push amdpsdo/gpu-operator:$RELEASE
-      # push OLM bundle images 
-      docker tag amdpsdo/gpu-operator-bundle:$PROJECT_VERSION amdpsdo/gpu-operator-olm-bundle:$RELEASE
-      docker push amdpsdo/gpu-operator-olm-bundle:$RELEASE
-      # push utils image
-      docker tag registry.test.pensando.io:5000/amd-gpu-operator-utils:$tag amdpsdo/gpu-operator-utils:$tag
-      docker push amdpsdo/gpu-operator-utils:$tag
-      docker tag registry.test.pensando.io:5000/amd-gpu-operator-utils:$tag amdpsdo/gpu-operator-utils:$RELEASE
-      docker push amdpsdo/gpu-operator-utils:$RELEASE
+      echo "DOCKERHUB_TOKEN is not set, skipping docker push"
+      return
     fi
+    docker login --username=shreyajmeraamd --password-stdin <<< "${DOCKERHUB_TOKEN}"
+    # push operator controller image
+    docker load -i /gpu-operator/gpu-operator.tar.gz
+    docker push docker.io/amdpsdo/gpu-operator:v$RELEASE
+    # push utils image
+    docker load -i /gpu-operator/gpu-operator-utils.tar.gz
+    docker push docker.io/amdpsdo/gpu-operator-utils:v$RELEASE
+    # push OLM bundle image
+    docker load -i /gpu-operator/gpu-operator-olm-bundle.tar.gz
+    docker push docker.io/amdpsdo/gpu-operator-bundle:$RELEASE
 }
 
 helm_push () {
-    if [ -z $DOCKERHUB_TOKEN ]
+    if [ -z "${DOCKERHUB_TOKEN:-}" ]
     then
-      echo "DOCKERHUB_TOKEN is not set"
-    else
-      helm registry login --username=shreyajmeraamd --password-stdin <<< $DOCKERHUB_TOKEN
-      # Push amdpsdo k8s helm chart
-      helm push /gpu-operator/build/charts/amdpsdo-gpu-operator-helm-k8s-$PROJECT_VERSION.tgz oci://docker.io/amdpsdo/gpu-operator-helm-charts
+      echo "DOCKERHUB_TOKEN is not set, skipping helm push"
+      return
     fi
+    helm registry login docker.io --username=shreyajmeraamd --password-stdin <<< "${DOCKERHUB_TOKEN}"
+    # Push amdpsdo k8s helm chart
+    helm push /gpu-operator/gpu-operator-helm-k8s.tgz oci://docker.io/amdpsdo
 }
 
 setup () {

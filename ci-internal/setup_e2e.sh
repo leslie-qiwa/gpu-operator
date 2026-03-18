@@ -29,13 +29,17 @@ kubectl label node dind-cluster-1c2w-worker2 feature.node.kubernetes.io/amd-gpu=
 DEVENV_PATH="/gpu-operator/dev.env"
 sudo sed -i "s#^DOCKER_REGISTRY ?= registry.test.pensando.io:5000#DOCKER_REGISTRY ?= $HOST_IP:$REGISTRY_PORT#" "$DEVENV_PATH"
 
-# Edit Makefile to use a unique image name for e2e and kmm version for the branch
+# Edit Makefile to use a unique image name for e2e
 MAKEFILE_PATH="/gpu-operator/Makefile"
 sudo sed -i 's/^IMAGE_NAME ?= amd-gpu-operator/IMAGE_NAME ?= root-e2e/' "$MAKEFILE_PATH"
-echo "JOB_BASE_BRANCH is $JOB_BASE_BRANCH"
-if [[ "$JOB_BASE_BRANCH" != "main" ]]; then
-    sudo sed -i "s/^KMM_IMAGE_TAG ?= latest/KMM_IMAGE_TAG ?= $JOB_BASE_BRANCH/" "$MAKEFILE_PATH"
-fi
+
+# Read KMM tag from dev.env
+# This helps in pinning a specific KMM version for the e2e tests.
+# E2E_KMM_TAG is defined in dev.env to help keep all e2e parameters in one place.
+KMM_TAG=$(grep 'E2E_KMM_TAG' "$DEVENV_PATH" | cut -d'=' -f2- | tr -d ' ')
+echo "KMM_TAG is $KMM_TAG"
+sudo sed -i "s/^KMM_IMAGE_TAG ?= .*/KMM_IMAGE_TAG ?= $KMM_TAG/" "$MAKEFILE_PATH"
+
 
 # # Edit e2e testcase config to use local registry IP
 TESTSUITE_PATH="/gpu-operator/tests/e2e/cluster_tests.go"
@@ -47,12 +51,6 @@ TESTSUITE_CHART_PATH="/gpu-operator/tests/e2e/yamls/charts"
 sudo find "$TESTSUITE_CHART_PATH" -type f -exec sed -i "s/test_host_ip/$HOST_IP/g" {} +
 sudo tar -czvf "${TESTSUITE_CHART_PATH}/gpu-operator-helm-k8s-v1.0.0.tgz" -C "${TESTSUITE_CHART_PATH}" gpu-operator
 
-# Determine KMM image tag — matches the sed applied to the Makefile above
-if [[ "$JOB_BASE_BRANCH" != "main" ]]; then
-    KMM_TAG="$JOB_BASE_BRANCH"
-else
-    KMM_TAG="latest"
-fi
 
 # Load kmm images from tarballs for the KMM upgrade testcase
 KMMOPERATOR_IMAGE_TAR="/gpu-operator/tests/e2e/yamls/container/kernel-module-management-operator-dev.tar"
@@ -98,8 +96,8 @@ sudo docker rmi registry.test.pensando.io:5000/kernel-module-management-operator
 sudo docker rmi registry.test.pensando.io:5000/kernel-module-management-worker:dev
 sudo docker rmi registry.test.pensando.io:5000/kernel-module-management-webhook-server:dev
 
-# Pull KMM images from pensando registry (latest) and push to local registry
-# with the branch tag so the helm chart can find them.
+# Pull KMM images from pensando registry and push to local registry
+# with the KMM_TAG so the helm chart can find them.
 PENSANDO_REGISTRY="registry.test.pensando.io:5000"
 for img in kernel-module-management-operator kernel-module-management-webhook-server kernel-module-management-worker kernel-module-management-signimage; do
   sudo docker pull $PENSANDO_REGISTRY/$img:$KMM_TAG
