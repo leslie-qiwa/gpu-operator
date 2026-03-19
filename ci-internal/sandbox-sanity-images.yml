@@ -15,13 +15,13 @@ images:
           kind          : container
 
         gpu-operator:
-            image       : file://sandbox/gpu-operator/build/charts/internal-gpu-operator-helm-k8s-v1.4.0.tgz
+            image       : file://sandbox/gpu-operator/gpu-operator-helm-k8s.tgz
             kind        : helm-chart
-            version     : v1.4.0
+            version     : v1.5.0
 
         gpu-controller-manager:
             key         : controllerManager.manager.image
-            image       : file://sandbox/gpu-operator/amd-gpu-operator-latest.tar.gz
+            image       : file://sandbox/gpu-operator/gpu-operator.tar.gz
             kind        : container
 
         exporter:

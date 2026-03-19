@@ -15,13 +15,13 @@ images:
           kind          : container
 
         gpu-operator:
-            image       : file:///gpu-operator/build/charts/internal-gpu-operator-helm-k8s.tgz
+            image       : file:///gpu-operator/gpu-operator-helm-k8s.tgz
             kind        : helm-chart
             version     : v1.5.0
 
         gpu-controller-manager:
             key         : controllerManager.manager.image
-            image       : file:///gpu-operator/amd-gpu-operator-latest.tar.gz
+            image       : file:///gpu-operator/gpu-operator.tar.gz
             kind        : container
 
         exporter:
@@ -114,13 +114,13 @@ images:
           kind          : container
 
         gpu-operator:
-            image       : file:///gpu-operator/build/charts/internal-gpu-operator-helm-k8s.tgz
+            image       : file:///gpu-operator/gpu-operator-helm-k8s.tgz
             kind        : helm-chart
             version     : v1.5.0
 
         gpu-controller-manager:
             key         : controllerManager.manager.image
-            image       : file:///gpu-operator/amd-gpu-operator-latest.tar.gz
+            image       : file:///gpu-operator/gpu-operator.tar.gz
             kind        : container
 
         exporter-debian-Ubuntu-22.04:
@@ -187,7 +187,7 @@ images:
             image       : container://docker.io/amdpsdo/gpu-operator-olm-bundle
             metadata    : file:///gpu-operator/artifacts.metadata
             kind        : olm-bundle
-            version     : v1.4.1
+            version     : v1.5.0
             secret      : docker-amdpsdo-auth
 
         device-metrics-exporter:
