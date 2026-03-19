@@ -198,6 +198,7 @@ def test_dra_driver_install(
     gpu_cluster,
     dra_driver_release_name,
     dra_driver_namespace,
+    amdgpu_driver_install,
     dra_driver_install,
     environment,
 ):
@@ -259,7 +260,7 @@ def test_dra_driver_install(
     Logger.info("DRA driver installation validation complete")
 
 
-def test_dra_driver_gpu_node_labels(dra_driver_install, environment):
+def test_dra_driver_gpu_node_labels(amdgpu_driver_install, dra_driver_install, environment):
     """Test that GPU nodes have appropriate labels for DRA"""
     global Logger
 
@@ -290,11 +291,12 @@ def test_dra_driver_uninstall(
     gpu_cluster,
     dra_driver_release_name,
     dra_driver_namespace,
+    amdgpu_driver_install,
     dra_driver_install,
     environment,
 ):
     """Test DRA driver uninstallation and cleanup
-    
+
     This test performs actual uninstallation and should be run:
     - As part of the full test suite (for complete cleanup)
     - Explicitly when you want to cleanup after manual testing

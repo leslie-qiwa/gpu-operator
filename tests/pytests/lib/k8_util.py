@@ -1143,26 +1143,78 @@ def k8_check_pod_status(namespace, pod_list) -> Dict:
 
 
 @log_arguments
-def k8_check_pod_running(namespace : str, pod_list : List, sleep_time : int = 10, total_attempts : int = 10):
+def k8_check_pod_running(namespace : str, pod_list : List, sleep_time : int = 10, total_attempts : int = 30):
     """
     API to check if ALL of given list of PODs are running
+
+    Args:
+        namespace: Kubernetes namespace
+        pod_list: List of PodInfo objects to check
+        sleep_time: Seconds to wait between attempts (default: 10)
+        total_attempts: Maximum number of attempts (default: 30, total ~5min)
+
+    Returns:
+        List of pod names that failed to reach Running state
     """
     global Logger
     global LogPrettyPrinter
+
+    def _get_container_status_reason(container_status):
+        """Extract the reason why a container isn't running"""
+        if container_status.get('state', {}).get('waiting'):
+            return container_status['state']['waiting'].get('reason', 'Unknown')
+        elif container_status.get('state', {}).get('terminated'):
+            return f"Terminated: {container_status['state']['terminated'].get('reason', 'Unknown')}"
+        return None
+
     def _is_pod_present_and_match_status(k8_pod_list, pod_name, exp_pod_count, exp_cont_count, exp_status):
         sel_pods = list(filter(lambda x: pod_name in x['metadata'].get('name', None), k8_pod_list))
         if len(sel_pods) < exp_pod_count:
-            Logger.warn(f"Found {len(sel_pods)} instances of pod_name: {pod_name}")
+            Logger.warn(f"Found {len(sel_pods)} instances of pod_name: {pod_name}, expected {exp_pod_count}")
             return False
 
         match_status = True
         for sel_pod_info in sel_pods:
             status_json = sel_pod_info.get('status', None)
-            if status_json and status_json.get('phase', None) != exp_status:
+            if not status_json:
                 match_status = False
-                status = status_json.get('phase', None)
-                Logger.warn(f"Pod: {pod_name} instance in {status} and not in {exp_status}")
-                #Logger.debug(f"PodInfo:\n{LogPrettyPrinter.pformat(sel_pod_info)}")
+                Logger.warn(f"Pod: {pod_name} has no status")
+                continue
+
+            pod_phase = status_json.get('phase', None)
+            if pod_phase != exp_status:
+                match_status = False
+
+                # Get detailed container status info
+                container_statuses = status_json.get('containerStatuses', [])
+                init_container_statuses = status_json.get('initContainerStatuses', [])
+
+                # Check for image pull issues in regular containers
+                for cs in container_statuses:
+                    reason = _get_container_status_reason(cs)
+                    if reason:
+                        container_name = cs.get('name', 'unknown')
+                        if 'ImagePull' in reason or 'ErrImagePull' in reason:
+                            Logger.warn(f"Pod: {pod_name} container '{container_name}' is pulling image: {reason}")
+                        elif 'CrashLoopBackOff' in reason or 'Error' in reason:
+                            Logger.error(f"Pod: {pod_name} container '{container_name}' failed: {reason}")
+                        else:
+                            Logger.warn(f"Pod: {pod_name} container '{container_name}' state: {reason}")
+
+                # Check for image pull issues in init containers
+                for cs in init_container_statuses:
+                    reason = _get_container_status_reason(cs)
+                    if reason:
+                        container_name = cs.get('name', 'unknown')
+                        if 'ImagePull' in reason or 'ErrImagePull' in reason:
+                            Logger.warn(f"Pod: {pod_name} init container '{container_name}' is pulling image: {reason}")
+                        else:
+                            Logger.warn(f"Pod: {pod_name} init container '{container_name}' state: {reason}")
+
+                # If no container status available, just log pod phase
+                if not container_statuses and not init_container_statuses:
+                    Logger.warn(f"Pod: {pod_name} is in phase '{pod_phase}' (expected '{exp_status}')")
+
         return match_status
 
     assert len(pod_list) > 0, "No pods specified to verify"
@@ -1179,10 +1231,15 @@ def k8_check_pod_running(namespace : str, pod_list : List, sleep_time : int = 10
                 failed_pods.append(pod_info.PodName)
 
         if failed_pods:
-            time.sleep(sleep_time)
+            if x < total_attempts - 1:  # Don't sleep on last attempt
+                Logger.debug(f"Attempt {x+1}/{total_attempts}: Waiting for pods to be ready: {failed_pods}")
+                time.sleep(sleep_time)
         else:
+            Logger.info(f"All pods are running after {x+1} attempt(s)")
             break
+
     if failed_pods:
+        Logger.error(f"Pods failed to reach Running state after {total_attempts} attempts: {failed_pods}")
         Logger.debug(f"Status of the Pods {pod_list}\n{LogPrettyPrinter.pformat(k8_pod_list)}")
     return failed_pods
 

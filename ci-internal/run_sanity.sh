@@ -284,6 +284,20 @@ function launch_pytest_k8() {
         chmod +x /gpu-operator/tests/pytests/exporter_techsupport_dump.sh
         export TECH_SUPPORT_TOOL=/gpu-operator/tests/pytests/exporter_techsupport_dump.sh
     fi
+    if [[ "${APP_NAME}" == "dra-driver" ]];
+    then
+        # DRA driver tech support tool (if available in the future)
+        # cp /dra-driver/tools/techsupport_dump.sh /gpu-operator/tests/pytests/dra_driver_techsupport_dump.sh
+        # chmod +x /gpu-operator/tests/pytests/dra_driver_techsupport_dump.sh
+        # export TECH_SUPPORT_TOOL=/gpu-operator/tests/pytests/dra_driver_techsupport_dump.sh
+        echo "Configuring DRA driver testing"
+
+        # Set environment variable to skip cleanup if driver already installed
+        # This speeds up iterative testing
+        export DRA_SKIP_CLEANUP=${DRA_SKIP_CLEANUP:-false}
+
+        echo "DRA_SKIP_CLEANUP=${DRA_SKIP_CLEANUP}"
+    fi
     if [[ "${MODULE}" != "ALL" ]] ;
     then
         CMD_OPTS+=" --module ${MODULE}"

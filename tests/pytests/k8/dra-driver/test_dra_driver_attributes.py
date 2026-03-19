@@ -39,20 +39,38 @@ from lib.util import K8Helper
 Logger = logging.getLogger("k8.test_dra_driver_attributes")
 
 # Common validation constants
-REQUIRED_DEVICE_ATTRS = [
+# Attributes shared by both full GPUs and partitions
+COMMON_ATTRS = [
     "type",
-    "pciAddr",
     "cardIndex",
     "renderIndex",
-    "deviceID",
     "family",
     "productName",
     "driverVersion",
     "driverSrcVersion",
 ]
 
-CRITICAL_ATTRS = [
+# Required attributes for FULL GPUs
+REQUIRED_FULL_GPU_ATTRS = COMMON_ATTRS + [
     "deviceID",
+    "pciAddr",
+]
+
+# Required attributes for PARTITIONS
+# Note: Partitions don't have deviceID or pciAddr in new format
+# They use parentDeviceID and parentPciAddr instead
+REQUIRED_PARTITION_ATTRS = COMMON_ATTRS + [
+    "partitionProfile",
+    "parentPciAddr",
+    "parentDeviceID",
+]
+
+# Optional attributes that may be present for partitions
+OPTIONAL_PARTITION_ATTRS = ["numaNode"]
+
+# Critical attributes shared by both full GPUs and partitions
+# Note: deviceID is critical for full GPUs but NOT present in partitions
+CRITICAL_ATTRS = [
     "family",
     "productName",
     "driverVersion",
@@ -73,12 +91,15 @@ def skip_module(environment):
 
 
 @pytest.fixture(scope="module")
-def gpu_hardware_info(gpu_cluster, environment):
+def gpu_hardware_info(amdgpu_driver_install, gpu_cluster, environment):
     """
     Collect hardware information for all GPU nodes once.
 
     This fixture collects hardware data only once per test module,
     reducing the number of pod creations from 3N to N (where N = number of nodes).
+
+    Depends on amdgpu_driver_install to ensure the driver is loaded before
+    collecting hardware information.
 
     Returns:
         Dict mapping node_name -> {
@@ -170,7 +191,15 @@ def get_amd_gpu_devices_from_slices(resource_slices=None, node_name=None):
         if node_name and slice_node != node_name:
             continue
 
-        devices = slice_obj.get("spec", {}).get("devices", [])
+        devices = slice_obj.get("spec", {}).get("devices")
+
+        # Skip if devices is null (e.g., controller nodes without GPUs)
+        if devices is None:
+            Logger.info(
+                f"  Slice '{slice_name}' on node '{slice_node}': No devices (null) - skipping"
+            )
+            continue
+
         Logger.info(
             f"  Slice '{slice_name}' on node '{slice_node}': {len(devices)} device(s)"
         )
@@ -294,14 +323,39 @@ def validate_device_type(device_name, gpu_attrs, expected_type, environment):
 
 
 def validate_pci_address_format(device_name, gpu_attrs, environment):
-    """Validate PCI address format"""
+    """Validate PCI address format
+
+    Note: pciAddr may be null for partitions in new format.
+    In that case, parentPciAddr should be present instead.
+    """
     pci_addr = gpu_attrs.get("pciAddr", "")
-    pci_pattern = r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]$"
+    parent_pci_addr = gpu_attrs.get("parentPciAddr", "")
+
+    # Either pciAddr or parentPciAddr should be present
+    has_pci = pci_addr or parent_pci_addr
     K8Helper.triage(
         environment,
-        re.match(pci_pattern, pci_addr) is not None,
-        f"Device {device_name}: Invalid PCI address format '{pci_addr}'",
+        has_pci,
+        f"Device {device_name}: Neither pciAddr nor parentPciAddr is set",
     )
+
+    # Validate format if pciAddr is present
+    if pci_addr:
+        pci_pattern = r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]$"
+        K8Helper.triage(
+            environment,
+            re.match(pci_pattern, pci_addr) is not None,
+            f"Device {device_name}: Invalid pciAddr format '{pci_addr}'",
+        )
+
+    # Validate format if parentPciAddr is present
+    if parent_pci_addr:
+        pci_pattern = r"^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]$"
+        K8Helper.triage(
+            environment,
+            re.match(pci_pattern, parent_pci_addr) is not None,
+            f"Device {device_name}: Invalid parentPciAddr format '{parent_pci_addr}'",
+        )
 
 
 def validate_critical_attributes_not_empty(
@@ -486,6 +540,8 @@ def validate_full_gpu_attributes(device, environment):
 
     As documented in: https://github.com/ROCm/k8s-gpu-dra-driver/blob/main/docs/driver-attributes.md#attributes-for-a-full-gpu
 
+    Note: Full GPUs have deviceID and pciAddr attributes.
+
     Args:
         device: Device dict with fields: name, type, attributes, capacity
         environment: Test environment
@@ -500,13 +556,30 @@ def validate_full_gpu_attributes(device, environment):
     Logger.info(f"  Attributes: {json.dumps(gpu_attrs, indent=2)}")
     Logger.info(f"  Capacity: {json.dumps(capacity, indent=2)}")
 
-    # Validate common attributes (shared with partitions)
+    # Validate full GPU required attributes
     validate_common_device_attributes(
-        device_name, gpu_attrs, capacity, REQUIRED_DEVICE_ATTRS, environment
+        device_name, gpu_attrs, capacity, REQUIRED_FULL_GPU_ATTRS, environment
     )
 
     # Validate full GPU specific attributes
     validate_device_type(device_name, gpu_attrs, "amdgpu", environment)
+
+    # Validate deviceID is not empty (critical for full GPUs)
+    device_id = gpu_attrs.get("deviceID", "")
+    K8Helper.triage(
+        environment,
+        device_id != "",
+        f"Full GPU {device_name}: deviceID is required but missing or empty",
+    )
+
+    # Validate pciAddr is not empty (critical for full GPUs)
+    pci_addr = gpu_attrs.get("pciAddr", "")
+    K8Helper.triage(
+        environment,
+        pci_addr != "",
+        f"Full GPU {device_name}: pciAddr is required but missing or empty",
+    )
+
     validate_partition_profile_full_gpu(device_name, gpu_attrs, environment)
 
     # Validate pcieRoot attribute (optional)
@@ -518,6 +591,10 @@ def validate_partition_attributes(device, environment):
     """Validate attributes for a GPU partition device
 
     As documented in: https://github.com/ROCm/k8s-gpu-dra-driver/blob/main/docs/driver-attributes.md#attributes-for-a-partition
+
+    Note: When a GPU is partitioned (e.g., CPX_NPS4), the DRA driver reports ALL devices
+    as type "amdgpu-partition", including the full GPU's renderD device. This is because
+    even the full GPU view operates under the partition profile.
 
     Args:
         device: Device dict with fields: name, type, attributes, capacity
@@ -533,28 +610,53 @@ def validate_partition_attributes(device, environment):
     Logger.info(f"  Attributes: {json.dumps(gpu_attrs, indent=2)}")
     Logger.info(f"  Capacity: {json.dumps(capacity, indent=2)}")
 
-    # Required attributes for partition (extends base with partitionProfile)
-    required_attrs = REQUIRED_DEVICE_ATTRS + ["partitionProfile"]
-
-    # Validate common attributes (shared with full GPU)
+    # Validate common attributes (using partition-specific required attrs)
     validate_common_device_attributes(
-        device_name, gpu_attrs, capacity, required_attrs, environment
+        device_name, gpu_attrs, capacity, REQUIRED_PARTITION_ATTRS, environment
     )
 
     # Validate partition specific attributes
     validate_device_type(device_name, gpu_attrs, "amdgpu-partition", environment)
     validate_partition_profile_format(device_name, gpu_attrs, environment)
 
+    # Validate parent PCI address is set (required)
+    parent_pci_addr = gpu_attrs.get("parentPciAddr", "")
+    K8Helper.triage(
+        environment,
+        parent_pci_addr != "",
+        f"Partition {device_name}: parentPciAddr is required but missing or empty",
+    )
+
+    # Validate parent device ID is set (required)
+    parent_device_id = gpu_attrs.get("parentDeviceID", "")
+    K8Helper.triage(
+        environment,
+        parent_device_id != "",
+        f"Partition {device_name}: parentDeviceID is required but missing or empty",
+    )
+
+    # Validate numaNode if present (optional attribute)
+    numa_node = gpu_attrs.get("numaNode")
+    if numa_node is not None:
+        K8Helper.triage(
+            environment,
+            isinstance(numa_node, int) and numa_node >= 0,
+            f"Partition {device_name}: numaNode must be a non-negative integer if present, got {numa_node}",
+        )
+        Logger.info(f"  ✓ numaNode: {numa_node}")
+
     # Validate pcieRoot attribute (optional)
-    pci_addr = gpu_attrs.get("pciAddr", "")
+    # Note: pciAddr may be null for partitions in new format - use parentPciAddr instead
+    pci_addr = gpu_attrs.get("pciAddr", "") or parent_pci_addr
     validate_pcie_root_attribute(device_name, pci_addr, gpu_attrs, environment)
 
 
 def validate_device_identifiers_uniqueness(amd_devices, environment):
     """Validate uniqueness of device identifiers across all devices
 
-    Validates that cardIndex, renderIndex, deviceID (for full GPUs), and pciAddr (for full GPUs)
-    are unique. Partitions can share deviceID and pciAddr with their parent GPU.
+    Validates that cardIndex and renderIndex are unique across all devices.
+    DeviceID can be shared among partitions from the same parent GPU.
+    pciAddr may be null for partitions (they use parentPciAddr instead).
     """
     Logger.info("Validating uniqueness of device identifiers...")
 
@@ -567,7 +669,6 @@ def validate_device_identifiers_uniqueness(amd_devices, environment):
     for device in amd_devices:
         attrs = device.get("attributes", {})
         device_name = device.get("name", "")
-        device_type = device.get("type", "")
 
         card_idx = attrs.get("cardIndex")
         render_idx = attrs.get("renderIndex")
@@ -592,27 +693,19 @@ def validate_device_identifiers_uniqueness(amd_devices, environment):
             )
             render_indices_map[render_idx] = device_name
 
-        # Check for duplicate deviceID - only allowed for partitions (share parent GPU's ID)
+        # DeviceID can be shared among partitions from same parent GPU
+        # Just track them for reference, no uniqueness check
         if device_id:
-            if device_id in device_ids_map and device_type == "amdgpu":
-                K8Helper.triage(
-                    environment,
-                    False,
-                    f"Duplicate deviceID {device_id} on full GPU: already used by {device_ids_map[device_id]}, found again on {device_name}",
-                )
             if device_id not in device_ids_map:
-                device_ids_map[device_id] = device_name
+                device_ids_map[device_id] = []
+            device_ids_map[device_id].append(device_name)
 
-        # Check for duplicate pciAddr - only allowed for partitions (share parent GPU's PCI)
+        # pciAddr tracking (may be null for partitions using new format)
+        # In new format, partitions have pciAddr=null and use parentPciAddr instead
         if pci_addr:
-            if pci_addr in pci_addrs_map and device_type == "amdgpu":
-                K8Helper.triage(
-                    environment,
-                    False,
-                    f"Duplicate pciAddr {pci_addr} on full GPU: already used by {pci_addrs_map[pci_addr]}, found again on {device_name}",
-                )
             if pci_addr not in pci_addrs_map:
-                pci_addrs_map[pci_addr] = device_name
+                pci_addrs_map[pci_addr] = []
+            pci_addrs_map[pci_addr].append(device_name)
 
         # Validate device naming convention: gpu-<cardIndex>-<renderIndex>
         name_pattern = r"^gpu-\d+-\d+$"
@@ -690,11 +783,18 @@ def validate_common_attributes_consistency(amd_devices, environment):
 def validate_partition_parent_correlation(amd_devices, environment):
     """Validate partitions are correctly linked to their parent GPUs
 
-    Checks that each partition has a matching parent GPU with same deviceID and pciAddr.
+    When GPU is unpartitioned (SPX_NPS1):
+    - Parent is type "amdgpu" with deviceID and pciAddr
+    - Partitions (if any) reference it
+
+    When GPU is partitioned (e.g., CPX_NPS4):
+    - ALL devices are type "amdgpu-partition"
+    - The "parent" is the device with lowest renderIndex (full GPU renderD)
+    - Other partitions reference it via parentDeviceID and parentPciAddr
     """
     Logger.info("Validating partition correlation to parent GPUs...")
 
-    # Separate full GPUs and partitions
+    # Separate by type
     full_gpus = [d for d in amd_devices if d.get("type") == "amdgpu"]
     partitions = [d for d in amd_devices if d.get("type") == "amdgpu-partition"]
 
@@ -703,74 +803,112 @@ def validate_partition_parent_correlation(amd_devices, environment):
         return
 
     Logger.info(
-        f"Found {len(partitions)} partition(s) to validate against {len(full_gpus)} full GPU(s)"
+        f"Found {len(partitions)} partition device(s), {len(full_gpus)} full GPU(s)"
     )
 
-    # Build a map of deviceID -> full GPU
-    device_id_map = {}
+    # Build parent device maps
+    # For unpartitioned GPUs: parent is type "amdgpu"
+    # For partitioned GPUs: parent is the partition with lowest renderIndex (full GPU view)
+    parent_by_pci = {}
+    parent_by_device_id = {}
+
+    # Add full GPU devices as potential parents
     for gpu in full_gpus:
         device_id = gpu.get("attributes", {}).get("deviceID", "")
+        pci_addr = gpu.get("attributes", {}).get("pciAddr", "")
         if device_id:
-            device_id_map[device_id] = gpu
+            parent_by_device_id[device_id] = gpu
+        if pci_addr:
+            parent_by_pci[pci_addr] = gpu
 
-    # Validate each partition correlates to a parent GPU
+    # For partitioned GPUs, identify the "parent" partition (lowest renderIndex per PCI)
+    # Group partitions by parentPciAddr
+    partitions_by_parent_pci = {}
+    for part in partitions:
+        parent_pci = part.get("attributes", {}).get("parentPciAddr", "")
+        if parent_pci:
+            if parent_pci not in partitions_by_parent_pci:
+                partitions_by_parent_pci[parent_pci] = []
+            partitions_by_parent_pci[parent_pci].append(part)
+
+    # For each PCI address with partitions, find the one with lowest renderIndex
+    for parent_pci, parts in partitions_by_parent_pci.items():
+        # Sort by renderIndex to find the "parent" partition (lowest index = full GPU view)
+        parts_sorted = sorted(parts, key=lambda p: p.get("attributes", {}).get("renderIndex", 999))
+        if parts_sorted:
+            parent_partition = parts_sorted[0]
+            parent_device_id = parent_partition.get("attributes", {}).get("parentDeviceID", "")
+
+            # Add this as a parent reference
+            if parent_pci not in parent_by_pci:
+                parent_by_pci[parent_pci] = parent_partition
+            if parent_device_id and parent_device_id not in parent_by_device_id:
+                parent_by_device_id[parent_device_id] = parent_partition
+
+    Logger.info(f"  Identified {len(parent_by_pci)} parent device(s) by PCI address")
+
+    # Validate each partition correlates to a parent
+    # Skip validation for the "parent" partitions themselves (lowest renderIndex per PCI)
+    validated_count = 0
+    skipped_parent_count = 0
+
     for partition in partitions:
         partition_name = partition.get("name", "")
         part_attrs = partition.get("attributes", {})
-        partition_type = partition.get("type", "")
-        partition_device_id = part_attrs.get("deviceID", "")
-        partition_pci_addr = part_attrs.get("pciAddr", "")
+        partition_render_idx = part_attrs.get("renderIndex")
+
+        parent_device_id = part_attrs.get("parentDeviceID", "")
+        parent_pci_addr = part_attrs.get("parentPciAddr", "")
+
+        # Check if this partition IS the parent (lowest renderIndex for its PCI address)
+        is_parent = False
+        if parent_pci_addr in partitions_by_parent_pci:
+            sorted_parts = sorted(
+                partitions_by_parent_pci[parent_pci_addr],
+                key=lambda p: p.get("attributes", {}).get("renderIndex", 999)
+            )
+            if sorted_parts and sorted_parts[0].get("name") == partition_name:
+                is_parent = True
+                skipped_parent_count += 1
+                Logger.debug(
+                    f"  Skipping {partition_name}: This is the parent partition (lowest renderIndex) for PCI {parent_pci_addr}"
+                )
+                continue
+
+        # Validate non-parent partitions
         partition_profile = part_attrs.get("partitionProfile", "")
 
-        # Verify required partition attributes
-        K8Helper.triage(
-            environment,
-            partition_type == "amdgpu-partition",
-            f"Partition {partition_name}: Expected type='amdgpu-partition', got '{partition_type}'",
-        )
-        K8Helper.triage(
-            environment,
-            partition_device_id != "",
-            f"Partition {partition_name}: deviceID is missing or empty",
-        )
-        K8Helper.triage(
-            environment,
-            partition_profile != "",
-            f"Partition {partition_name}: partitionProfile is missing or empty",
-        )
+        # Try to find parent by PCI address first (most reliable)
+        parent_device = parent_by_pci.get(parent_pci_addr)
 
-        # Check if parent GPU exists
-        if partition_device_id in device_id_map:
-            parent_gpu = device_id_map[partition_device_id]
-            parent_pci = parent_gpu.get("attributes", {}).get("pciAddr", "")
-            parent_type = parent_gpu.get("type", "")
+        if not parent_device and parent_device_id:
+            # Fallback to deviceID lookup
+            parent_device = parent_by_device_id.get(parent_device_id)
 
-            # Verify parent type is full GPU
+        if parent_device:
+            parent_name = parent_device.get("name", "")
+            parent_type = parent_device.get("type", "")
+
+            # For partitioned GPUs, parent can be either "amdgpu" or "amdgpu-partition" (the base partition)
             K8Helper.triage(
                 environment,
-                parent_type == "amdgpu",
-                f"Partition {partition_name}: Parent device has unexpected type '{parent_type}', expected 'amdgpu'",
-            )
-
-            # Verify PCI address matches parent
-            K8Helper.triage(
-                environment,
-                partition_pci_addr == parent_pci,
-                f"Partition {partition_name}: PCI address mismatch with parent",
+                parent_type in ["amdgpu", "amdgpu-partition"],
+                f"Partition {partition_name}: Parent device has unexpected type '{parent_type}'",
             )
 
             Logger.debug(
-                f"✓ Partition {partition_name} (profile: {partition_profile}) linked to parent GPU {parent_gpu.get('name')}"
+                f"  ✓ Partition {partition_name} (profile: {partition_profile}) → parent {parent_name} (type: {parent_type})"
             )
+            validated_count += 1
         else:
             K8Helper.triage(
                 environment,
                 False,
-                f"Partition {partition_name}: No parent GPU found with deviceID={partition_device_id}",
+                f"Partition {partition_name}: No parent found with parentPciAddr={parent_pci_addr} or parentDeviceID={parent_device_id}",
             )
 
     Logger.info(
-        f"✓ All {len(partitions)} partition(s) correctly correlated to parent GPUs"
+        f"✓ Validated {validated_count} partition(s), skipped {skipped_parent_count} parent partition(s)"
     )
 
 
@@ -831,7 +969,7 @@ def validate_pcie_root_attribute(device_name, pci_addr, gpu_attrs, environment):
         )
 
 
-def test_dra_driver_device_attributes(dra_driver_install, environment):
+def test_dra_driver_device_attributes(amdgpu_driver_install, dra_driver_install, environment):
     """Test that DRA driver advertises all required device attributes
 
     Validates attributes documented in:
@@ -914,9 +1052,17 @@ def test_dra_driver_device_attributes(dra_driver_install, environment):
 
 
 def test_dra_gpu_count_matches_hardware(
-    dra_driver_install, environment, gpu_hardware_info
+    amdgpu_driver_install, dra_driver_install, environment, gpu_hardware_info
 ):
-    """Test that DRA advertises the same number of GPUs as detected by hardware"""
+    """Test that DRA advertises the correct number of devices based on hardware
+
+    For unpartitioned GPUs (SPX_NPS1): DRA advertises type "amdgpu" (full GPUs)
+    For partitioned GPUs (e.g., CPX_NPS4): DRA advertises type "amdgpu-partition" for all devices
+
+    The total device count should match:
+    - Unpartitioned: hardware GPU count
+    - Partitioned: hardware partition count (includes full GPU renderD as a partition)
+    """
     global Logger
 
     # Check each GPU node using cached hardware info
@@ -931,22 +1077,40 @@ def test_dra_gpu_count_matches_hardware(
         # Get DRA advertised devices for this node
         dra_devices = get_amd_gpu_devices_from_slices(node_name=node_name)
 
-        hw_count = len(hw_info["gpus"])
-        dra_count = len([d for d in dra_devices if d.get("type") == "amdgpu"])
+        # Count hardware GPUs and partitions
+        hw_gpu_count = len(hw_info["gpus"])
+        hw_partition_count = sum(len(gpu.get("partitions", [])) for gpu in hw_info["gpus"])
 
-        Logger.info(f"  Hardware GPUs: {hw_count}")
-        Logger.info(f"  DRA advertised GPUs: {dra_count}")
+        # Count DRA advertised devices by type
+        dra_full_gpu_count = len([d for d in dra_devices if d.get("type") == "amdgpu"])
+        dra_partition_count = len([d for d in dra_devices if d.get("type") == "amdgpu-partition"])
 
-        if hw_count != dra_count:
-            mismatches.append(f"{node_name}: HW={hw_count}, DRA={dra_count}")
+        Logger.info(f"  Hardware: {hw_gpu_count} GPU(s), {hw_partition_count} partition(s)")
+        Logger.info(f"  DRA advertised: {dra_full_gpu_count} full GPU(s), {dra_partition_count} partition(s)")
+
+        # Validation logic:
+        # If no partitions detected in hardware, DRA should report full GPUs
+        # If partitions detected, DRA reports all as partitions (including full GPU renderD)
+        if hw_partition_count == 0:
+            # Unpartitioned GPUs - expect full GPU type
+            if hw_gpu_count != dra_full_gpu_count:
+                mismatches.append(
+                    f"{node_name}: Unpartitioned GPUs - HW={hw_gpu_count}, DRA full GPUs={dra_full_gpu_count}"
+                )
+        else:
+            # Partitioned GPUs - expect partition type for all devices
+            if hw_partition_count != dra_partition_count:
+                mismatches.append(
+                    f"{node_name}: Partitioned GPUs - HW partitions={hw_partition_count}, DRA partitions={dra_partition_count}"
+                )
 
     # Report results
     if mismatches:
-        error_msg = f"GPU count mismatches found:\n" + "\n".join(mismatches)
+        error_msg = f"GPU/partition count mismatches found:\n" + "\n".join(mismatches)
         Logger.error(error_msg)
         K8Helper.triage(environment, False, error_msg)
     else:
-        Logger.info("✓ All nodes: DRA GPU count matches hardware detection")
+        Logger.info("✓ All nodes: DRA device count matches hardware detection")
 
 
 def compare_hw_attribute_with_dra(
@@ -1187,7 +1351,7 @@ def validate_partition_profile_from_hardware(
         Logger.debug(f"    ✓ partitionProfile matches: {expected_profile}")
 
 
-def test_dra_devices_match_hardware(dra_driver_install, environment, gpu_hardware_info):
+def test_dra_devices_match_hardware(amdgpu_driver_install, dra_driver_install, environment, gpu_hardware_info):
     """Test that DRA advertised GPU attributes match hardware per PCI address
 
     Enhanced validation that compares each GPU individually using PCI address as key.
@@ -1203,14 +1367,20 @@ def test_dra_devices_match_hardware(dra_driver_install, environment, gpu_hardwar
         # Use cached hardware info (collected once by fixture)
         hw_info = hw_data["hardware"]
 
-        # Build hardware GPU map by PCI address (normalized to long format)
+        # Build hardware GPU map by PCI address (use full format from collector)
         hw_gpus_by_pci = {}
         for gpu in hw_info["gpus"]:
-            pci_addr = gpu.get("pci_address_full") or gpu.get("pci_address", "")
-            # Normalize to long format (0000:06:00.0)
-            if pci_addr and pci_addr.count(":") == 1:
-                pci_addr = f"0000:{pci_addr}"
-            hw_gpus_by_pci[pci_addr] = gpu
+            # Prefer pci_address_full (always set by enhanced collector)
+            # Fallback to pci_address with normalization for backward compatibility
+            pci_addr = gpu.get("pci_address_full")
+            if not pci_addr:
+                pci_addr = gpu.get("pci_address", "")
+                # Normalize short format to long format (0000:06:00.0)
+                if pci_addr and pci_addr.count(":") == 1:
+                    pci_addr = f"0000:{pci_addr}"
+
+            if pci_addr:
+                hw_gpus_by_pci[pci_addr] = gpu
 
         Logger.info(f"  Hardware GPUs by PCI: {list(hw_gpus_by_pci.keys())}")
 
@@ -1218,19 +1388,32 @@ def test_dra_devices_match_hardware(dra_driver_install, environment, gpu_hardwar
         dra_devices = get_amd_gpu_devices_from_slices(node_name=node_name)
 
         # Build DRA device map by PCI address (can have full GPU + partitions on same PCI)
+        # Note: partitions may have pciAddr=null and use parentPciAddr instead
         dra_devices_by_pci = {}
         for device in dra_devices:
-            pci_addr = device["attributes"].get("pciAddr", "")
-            if pci_addr not in dra_devices_by_pci:
-                dra_devices_by_pci[pci_addr] = []
-            dra_devices_by_pci[pci_addr].append(device)
+            # Use pciAddr if available, otherwise parentPciAddr
+            pci_addr = device["attributes"].get("pciAddr") or device["attributes"].get("parentPciAddr", "")
+            if pci_addr:
+                if pci_addr not in dra_devices_by_pci:
+                    dra_devices_by_pci[pci_addr] = []
+                dra_devices_by_pci[pci_addr].append(device)
 
         # Pick representative device per PCI for common attribute checks
-        # Prefer full GPU, otherwise first partition device
+        # Prefer full GPU (type: amdgpu), otherwise the partition with lowest renderIndex
+        # (which represents the full GPU view in partitioned mode)
         dra_primary_by_pci = {}
         for pci_addr, devices in dra_devices_by_pci.items():
             full_gpu = next((d for d in devices if d.get("type") == "amdgpu"), None)
-            dra_primary_by_pci[pci_addr] = full_gpu if full_gpu else devices[0]
+            if full_gpu:
+                dra_primary_by_pci[pci_addr] = full_gpu
+            else:
+                # For partitioned GPUs, pick the one with lowest renderIndex
+                # This matches the hardware GPU's cardIndex/renderIndex
+                sorted_devices = sorted(
+                    devices,
+                    key=lambda d: d.get("attributes", {}).get("renderIndex", 999)
+                )
+                dra_primary_by_pci[pci_addr] = sorted_devices[0] if sorted_devices else devices[0]
 
         Logger.info(f"  DRA devices by PCI: {list(dra_devices_by_pci.keys())}")
 
@@ -1263,6 +1446,20 @@ def test_dra_devices_match_hardware(dra_driver_install, environment, gpu_hardwar
             validate_partition_profile_from_hardware(
                 node_name, pci_addr, hw_gpu, dra_devices_for_pci, environment
             )
+
+            # If hardware shows partitions, validate DRA reports correct partition count
+            hw_partitions = hw_gpu.get("partitions", [])
+            if hw_partitions:
+                hw_partition_count = len(hw_partitions)
+                dra_partition_count = len([d for d in dra_devices_for_pci if d.get("type") == "amdgpu-partition"])
+
+                K8Helper.triage(
+                    environment,
+                    hw_partition_count == dra_partition_count,
+                    f"Node {node_name}, PCI {pci_addr}: Hardware has {hw_partition_count} partition(s), "
+                    f"but DRA advertises {dra_partition_count} partition(s)",
+                )
+                Logger.info(f"  ✓ Partition count matches: {dra_partition_count} partition(s)")
 
             # Compare GPU attributes between hardware and DRA
             error_msg = validate_device_id_match(node_name, pci_addr, hw_gpu, dra_gpu)

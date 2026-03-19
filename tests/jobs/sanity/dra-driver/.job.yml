@@ -1,0 +1,36 @@
+---
+version: 2.0
+meta:
+
+
+image:
+  bind_dir: "/gpu-operator"
+  work_dir: "/gpu-operator"
+  
+
+e2e-targets:
+  dra-driver-k8s-1.34:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \ 
+         /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --k8-version 1.34.5 --app dra-driver \ 
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig \
+         --seed-image-manifest /gpu-operator/tests/jobs/sanity/dra-driver/dra_image_manifest.yaml"
+    ]
+    owners: ["email:leslie.wang@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+logfiles:
+  - /gpu-operator/tests/pytests/pytest_logs.tgz

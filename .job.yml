@@ -273,6 +273,7 @@ jobs:
     labels: ["CI-Sanity-Build"]
   tests/jobs/sanity:
     labels: ["CI-Pytest-Sanity"]
+  tests/jobs/sanity/dra-driver:
   tests/jobs/regression:
     labels: ["CI-Sanity-Build", "CI-Pytest-Regression"]
   tests/jobs/operand-release/v1.4.2:

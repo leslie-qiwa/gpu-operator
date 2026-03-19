@@ -730,6 +730,14 @@ def generate_dra_driver_values(images: Dict, output_file: str) -> bool:
     # Add other DRA driver specific configurations
     values["deviceClass"] = {"name": "gpu.amd.com"}
 
+    # Add node selector to only install kubelet plugin on AMD GPU nodes
+    # This prevents the DaemonSet from running on controller/master nodes without GPUs
+    values["kubeletPlugin"] = {
+        "nodeSelector": {
+            "feature.node.kubernetes.io/amd-gpu": "true"
+        }
+    }
+
     try:
         # Ensure the directory exists
         output_dir = os.path.dirname(output_file)

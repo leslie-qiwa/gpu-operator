@@ -66,6 +66,17 @@ images:
             version     : labeller-latest
             kind        : container
 
+        dra-driver:
+            location    : http://pm.test.pensando.io/systest/k8s-gpu-dra-driver-helm-k8s-v0.1.0.tgz
+            kind        : helm-chart
+            version     : v0.1.0
+
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
+            version     : leslie
+            kind        : container
+
         kmm-controller-manager-image-sign:
             key         : kmm.controller.manager.env.relatedImageSign
             image       : file:///kernel-module-management/kernel-module-management-signimage.tar.gz
