@@ -105,7 +105,7 @@ def verify_events(gpu_cluster, environment, profile, before, after):
                      f"Successful profile change has not happened with {profile}")
 
 @pytest.fixture(scope="module")
-def deviceconfig_install(gpu_cluster, images, gpu_operator_install, add_tolerations, environment):
+def deviceconfig_install(gpu_cluster, images, gpu_operator_install, create_dcm_configmap, add_tolerations, environment):
     global Logger
 
     # cleanup - remove any deviceconfigs and then gpu-operator helm-chart
@@ -122,6 +122,7 @@ def deviceconfig_install(gpu_cluster, images, gpu_operator_install, add_tolerati
     ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
     debug_on_failure(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
     debug_on_failure(environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster")
+    configmap = "config-map-config-manager"
 
     test_config = {
             'metadata.namespace' : environment.gpu_operator_namespace,
@@ -131,6 +132,7 @@ def deviceconfig_install(gpu_cluster, images, gpu_operator_install, add_tolerati
             'metricsExporter.serviceType' : 'NodePort',
             'testRunner.enable' : False,
             'configManager.enable' : True,
+            'configManager.config' : configmap,
         }
     test_config.update(images)
     test_cfg_map = spec_util.build_deviceconfig_cr_template(test_config, gpu_nodes, 'config-manager', environment.amdgpu_driver_spec)
@@ -186,7 +188,7 @@ def get_gpu_series(gpu_cluster, environment):
     debug_on_failure(environment, gpu_series, f"didn't find gpu_series from cluster")
 
 @pytest.fixture(scope="module")
-def create_dcm_configmap(deviceconfig_install, gpu_cluster, environment):
+def create_dcm_configmap(gpu_cluster, environment):
     namespace = environment.gpu_operator_namespace
     configmap = "config-map-config-manager"
 
@@ -199,7 +201,7 @@ def create_dcm_configmap(deviceconfig_install, gpu_cluster, environment):
     if os.path.exists(file_path):
         ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(namespace, configmap)
         k8_util.k8_create_configmap(namespace, configmap, file_path)
-    yield
+    yield configmap
     ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(namespace, configmap)
 
 def reset_dcm_profile(gpu_cluster, environment, skip_reboot = True):
@@ -232,13 +234,9 @@ def reset_dcm_profile(gpu_cluster, environment, skip_reboot = True):
     debug_on_failure(environment, gpu_series != None, f"Missing gpu-series information - collect tech-support to debug cluster")
     if gpu_series and 'MI3' in gpu_series:
         if _any_gpu_partitioned(gpu_nodes):
-            configmap = "config-map-config-manager"
             patch_body = {
                 "spec": {
                     "configManager": {
-                        "config": {
-                            "name": configmap
-                        },
                         "configManagerTolerations": [
                             {
                                 "effect": "NoExecute",
@@ -300,6 +298,8 @@ def reset_dcm_profile(gpu_cluster, environment, skip_reboot = True):
         k8_util.k8_untaint_node(node_name)
     # Watch for all pod creation
 
+    '''
+    FIXME: No specific need to remove config-map for the DCM
     patch_body = {
         "spec": {
             "configManager": {
@@ -324,7 +324,7 @@ def reset_dcm_profile(gpu_cluster, environment, skip_reboot = True):
             print(f"Successfully patched")
         except client.ApiException as e:
             pytest.fail(f"Failed to patch custom object: {e}")
- 
+    '''
 
     # Watch for all pod creation
     devicecfg_pods = [
@@ -685,7 +685,7 @@ def wait_for_pods(environment, local_workload_ctxts):
                                      "invalidmissingfields-memoryPartition",
                                      "invalidmissingfields-computePartition",
                                      "highgpucount_mostly_invalid"])
-def test_negative_partitioning(request, gpu_cluster, deviceconfig_install, create_dcm_configmap, environment, profile):
+def test_negative_partitioning(request, gpu_cluster, deviceconfig_install, environment, profile):
     global Logger
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if 'MI2' in gpu_series:
@@ -726,7 +726,6 @@ def test_negative_partitioning(request, gpu_cluster, deviceconfig_install, creat
     }
     local_workload_ctxts = []
     namespace = environment.gpu_operator_namespace
-    configmap = "config-map-config-manager"
     dut_node = gpu_cluster.find_node_by_gpu_series(gpu_series)
     file_path = os.path.join("lib", "files", f"partitioning_check_{gpu_series}_{dut_node.num_gpus}.json")
     with open(file_path) as fp:
@@ -760,9 +759,6 @@ def test_negative_partitioning(request, gpu_cluster, deviceconfig_install, creat
     patch_body = {
         "spec": {
             "configManager": {
-                "config": {
-                    "name": configmap
-                },
                 "configManagerTolerations": [
                     {
                         "effect": "NoSchedule",
@@ -837,7 +833,6 @@ def run_partition_test_scenario(gpu_cluster, environment, request, profile, work
     dut_node = gpu_cluster.find_node_by_gpu_series(gpu_series)
     local_workload_ctxts = []
     namespace = environment.gpu_operator_namespace
-    configmap = "config-map-config-manager"
     file_path = os.path.join("lib", "files", f"partitioning_check_{gpu_series}_{dut_node.num_gpus}.json")
     before_events = k8_util.k8_get_events(namespace=environment.gpu_operator_namespace)
 
@@ -914,9 +909,6 @@ def run_partition_test_scenario(gpu_cluster, environment, request, profile, work
     patch_body = {
         "spec": {
             "configManager": {
-                "config": {
-                    "name": configmap
-                },
                 "configManagerTolerations": [
                     {
                         "effect": "NoSchedule",
@@ -1016,8 +1008,7 @@ def run_partition_test_scenario(gpu_cluster, environment, request, profile, work
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS2", "DPX_NPS1", "CPX_NPS1", "CPX_NPS2", "SPX_NPS1"])
-def test_partitioning_no_workload_MI350X(gpu_cluster, deviceconfig_install, environment, request, 
-                                         create_dcm_configmap, profile):
+def test_partitioning_no_workload_MI350X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI350X':
         pytest.skip(f"Testcases specifically designed for MI350X")
@@ -1025,8 +1016,7 @@ def test_partitioning_no_workload_MI350X(gpu_cluster, deviceconfig_install, envi
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS2", "DPX_NPS1", "CPX_NPS1", "CPX_NPS2", "SPX_NPS1"])
-def test_partitioning_workload_MI350X(gpu_cluster, deviceconfig_install, environment, request, 
-                                         create_dcm_configmap, profile):
+def test_partitioning_workload_MI350X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI350X':
         pytest.skip(f"Testcases specifically designed for MI350X")
@@ -1034,8 +1024,7 @@ def test_partitioning_workload_MI350X(gpu_cluster, deviceconfig_install, environ
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS1", "QPX_NPS4", "CPX_NPS1", "CPX_NPS4", "SPX_NPS1"])
-def test_partitioning_no_workload_MI300X(gpu_cluster, deviceconfig_install, environment, request, 
-                                         create_dcm_configmap, profile):
+def test_partitioning_no_workload_MI300X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI300X':
         pytest.skip(f"Testcases specifically designed for MI300X")
@@ -1043,8 +1032,7 @@ def test_partitioning_no_workload_MI300X(gpu_cluster, deviceconfig_install, envi
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS1", "QPX_NPS4", "CPX_NPS1", "CPX_NPS4", "SPX_NPS1"])
-def test_partitioning_workload_MI300X(gpu_cluster, deviceconfig_install, environment, request, 
-                                         create_dcm_configmap, profile):
+def test_partitioning_workload_MI300X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI300X':
         pytest.skip(f"Testcases specifically designed for MI300X")
@@ -1052,8 +1040,7 @@ def test_partitioning_workload_MI300X(gpu_cluster, deviceconfig_install, environ
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS4", "DPX_NPS1", "CPX_NPS1", "CPX_NPS4", "SPX_NPS1"])
-def test_partitioning_no_workload_MI325X(gpu_cluster, deviceconfig_install, environment, request, 
-                                         create_dcm_configmap, profile):
+def test_partitioning_no_workload_MI325X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI325X':
         pytest.skip(f"Testcases specifically designed for MI325X")
@@ -1061,8 +1048,7 @@ def test_partitioning_no_workload_MI325X(gpu_cluster, deviceconfig_install, envi
 
 @pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS4", "DPX_NPS1", "CPX_NPS1", "CPX_NPS4", "SPX_NPS1"])
-def test_partitioning_workload_MI325X(gpu_cluster, deviceconfig_install, environment, request, 
-                                      create_dcm_configmap, profile):
+def test_partitioning_workload_MI325X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if gpu_series != 'MI325X':
         pytest.skip(f"Testcases specifically designed for MI325X")
@@ -1071,8 +1057,7 @@ def test_partitioning_workload_MI325X(gpu_cluster, deviceconfig_install, environ
 
 @pytest.mark.level23
 @pytest.mark.parametrize("profile", ["CPX_NPS1"])
-def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, environment, request,
-                                          create_dcm_configmap, profile):
+def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     if 'MI350x' not in gpu_series:
         pytest.skip(f"Testcases specifically designed for MI350X")
@@ -1102,8 +1087,7 @@ def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, env
 
 @pytest.mark.level23
 @pytest.mark.parametrize("profile", ["CPX_NPS4", "DPX_NPS2"])
-def test_partitioning_test_runner(gpu_cluster, deviceconfig_install, environment, request,
-                                  images, create_dcm_configmap, profile):
+def test_partitioning_test_runner(gpu_cluster, deviceconfig_install, environment, request, images, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
     ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
     if 'MI3' not in gpu_series:
@@ -1274,7 +1258,7 @@ def test_config_manager_operand_upgrade(deviceconfig_install, environment, alter
                                 f"Unexpected version found in the config-manager-container image post upgrade, {s_info}")
 
 @pytest.mark.level1
-def test_deviceconfig_config_manager_disable(gpu_cluster, deviceconfig_install, create_dcm_configmap, environment):
+def test_deviceconfig_config_manager_disable(gpu_cluster, deviceconfig_install, environment):
     global Logger
     ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
     debug_on_failure(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
