@@ -490,8 +490,8 @@ def _load_images(logger, registry, seed_image_manifest, image_manifest, target):
         if target in ['k8', 'standalone']:
             artifact_name = 'driver'
             driver_info = image_manifest_templ['images'][target][artifact_name]
-            # driver_info['location'] = f"container://{registry}/driver-builds"
-            driver_info['location'] = f"container://registry.test.pensando.io:5000/amdgpu_kmod"
+            driver_info['location'] = f"container://{registry}/driver-builds"
+            # driver_info['location'] = f"container://registry.test.pensando.io:5000/amdgpu_kmod"
         with open(image_manifest, 'w') as fp:
             yaml.dump(image_manifest_templ, fp)
     return result
