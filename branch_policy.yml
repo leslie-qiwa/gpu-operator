@@ -3,3 +3,5 @@
 # Defines the list of branches into which the changes would need cherry-picking
 cherry_pick_branches:
   - rocm/gpu-operator:main
+inherit_pr_description: True
+ai_conflict_resolution: True
