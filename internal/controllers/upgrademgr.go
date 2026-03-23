@@ -757,6 +757,8 @@ func (h *upgradeMgrHelper) getPod(ctx context.Context, podName string, namespace
 func (h *upgradeMgrHelper) clearNodeStatus() {
 
 	h.nodeStatus = new(sync.Map)
+	h.nodeUpgradeStartTime = new(sync.Map)
+	h.nodeBootID = new(sync.Map)
 }
 
 func (h *upgradeMgrHelper) specChanged(deviceConfig *amdv1alpha1.DeviceConfig) bool {

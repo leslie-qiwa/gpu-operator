@@ -28,6 +28,7 @@ kubectl label node dind-cluster-1c2w-worker2 feature.node.kubernetes.io/amd-gpu=
 # each CI run is fully self-contained and does not push to the shared remote.
 DEVENV_PATH="/gpu-operator/dev.env"
 sudo sed -i "s#^DOCKER_REGISTRY ?= registry.test.pensando.io:5000#DOCKER_REGISTRY ?= $HOST_IP:$REGISTRY_PORT#" "$DEVENV_PATH"
+sudo sed -i "s#^E2E_DRIVER_IMAGE_REPO = registry.test.pensando.io:5000/e2e#E2E_DRIVER_IMAGE_REPO = $HOST_IP:$REGISTRY_PORT/root-e2e#" "$DEVENV_PATH"
 
 # Edit Makefile to use a unique image name for e2e
 MAKEFILE_PATH="/gpu-operator/Makefile"
@@ -42,7 +43,7 @@ sudo sed -i "s/^KMM_IMAGE_TAG ?= .*/KMM_IMAGE_TAG ?= $KMM_TAG/" "$MAKEFILE_PATH"
 
 
 # # Edit e2e testcase config to use local registry IP
-TESTSUITE_PATH="/gpu-operator/tests/e2e/cluster_tests.go"
+TESTSUITE_PATH="/gpu-operator/tests/e2e/cluster_test.go"
 sed -i "s#registry.test.pensando.io:5000/e2e#$HOST_IP:$REGISTRY_PORT/root-e2e#g" "$TESTSUITE_PATH"
 #cat /gpu-operator/tests/e2e/cluster_tests.go
 

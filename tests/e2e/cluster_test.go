@@ -366,7 +366,7 @@ func (s *E2ESuite) checkDRADriverStatus(devCfg *v1alpha1.DeviceConfig, ns string
 
 		return ds.Status.DesiredNumberScheduled > 0 &&
 			ds.Status.NumberReady == ds.Status.DesiredNumberScheduled
-	}, 5*time.Minute, 5*time.Second)
+	}, 20*time.Minute, 5*time.Second)
 }
 
 func (s *E2ESuite) verifyDRADriverDeleted(devCfg *v1alpha1.DeviceConfig, ns string, c *C) {

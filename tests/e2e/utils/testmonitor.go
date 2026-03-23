@@ -545,8 +545,9 @@ func (tm *TestMonitor) collectNodeDiagnostics() {
 	log.Infof("[TestMonitor] Node diagnostics collection complete")
 }
 
-// collectFromNode creates a privileged pod on the given node, runs dmesg and
-// lsmod via nsenter, captures the output into separate files, and cleans up.
+// collectFromNode creates a privileged pod on the given node, runs dmesg,
+// lsmod, and amdgpu driver info via nsenter, captures each into separate
+// files, and cleans up.
 func (tm *TestMonitor) collectFromNode(ctx context.Context, diagDir string, nodeName string) {
 	nodeDir := filepath.Join(diagDir, sanitizeNodeName(nodeName))
 	if err := os.MkdirAll(nodeDir, 0755); err != nil {
@@ -562,7 +563,7 @@ func (tm *TestMonitor) collectFromNode(ctx context.Context, diagDir string, node
 
 	privileged := true
 	var zero int64
-	cmd := fmt.Sprintf("dmesg -T 2>/dev/null || dmesg; echo '%s'; lsmod", diagSeparator)
+	cmd := fmt.Sprintf("dmesg -T 2>/dev/null || dmesg; echo '%s'; lsmod; echo '%s'; echo '=== lsmod amdgpu ==='; lsmod | grep -E 'amdgpu|amddrm|amdttm|amd_sched' 2>/dev/null; echo '=== modinfo amdgpu ==='; modinfo amdgpu 2>/dev/null || echo 'amdgpu module not loaded'", diagSeparator, diagSeparator)
 
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -623,15 +624,19 @@ func (tm *TestMonitor) collectFromNode(ctx context.Context, diagDir string, node
 		return
 	}
 
-	parts := strings.SplitN(buf.String(), diagSeparator, 2)
+	parts := strings.SplitN(buf.String(), diagSeparator, 3)
 
 	dmesgData := ""
 	lsmodData := ""
+	driverData := ""
 	if len(parts) >= 1 {
 		dmesgData = strings.TrimSpace(parts[0])
 	}
 	if len(parts) >= 2 {
 		lsmodData = strings.TrimSpace(parts[1])
+	}
+	if len(parts) >= 3 {
+		driverData = strings.TrimSpace(parts[2])
 	}
 
 	if err := os.WriteFile(filepath.Join(nodeDir, "dmesg.log"), []byte(dmesgData+"\n"), 0644); err != nil {
@@ -639,6 +644,9 @@ func (tm *TestMonitor) collectFromNode(ctx context.Context, diagDir string, node
 	}
 	if err := os.WriteFile(filepath.Join(nodeDir, "lsmod.log"), []byte(lsmodData+"\n"), 0644); err != nil {
 		log.Warnf("[TestMonitor] Failed to write lsmod for node %s: %v", nodeName, err)
+	}
+	if err := os.WriteFile(filepath.Join(nodeDir, "amdgpu-driver.log"), []byte(driverData+"\n"), 0644); err != nil {
+		log.Warnf("[TestMonitor] Failed to write amdgpu driver info for node %s: %v", nodeName, err)
 	}
 
 	log.Infof("[TestMonitor] Collected diagnostics from node %s", nodeName)
