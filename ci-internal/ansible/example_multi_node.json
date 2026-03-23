@@ -1,0 +1,37 @@
+{
+  "name": "mi300-production",
+  "deployment": "k8",
+  "instances": [
+    {
+      "ip": "10.11.78.80",
+      "type": "master",
+      "username": "ubuntu",
+      "password": "SecurePass123",
+      "registry": "yes"
+    },
+    {
+      "ip": "10.11.130.28",
+      "type": "worker",
+      "username": "ubuntu",
+      "password": "SecurePass123",
+      "gpu_series": "MI300X",
+      "gpu_count": 8
+    },
+    {
+      "ip": "10.11.130.29",
+      "type": "worker",
+      "username": "ubuntu",
+      "password": "SecurePass123",
+      "gpu_series": "MI300X",
+      "gpu_count": 8
+    },
+    {
+      "ip": "10.11.130.30",
+      "type": "worker",
+      "username": "ubuntu",
+      "password": "SecurePass123",
+      "gpu_series": "MI200",
+      "gpu_count": 4
+    }
+  ]
+}

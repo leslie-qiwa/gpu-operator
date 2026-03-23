@@ -1,0 +1,95 @@
+---
+# Docker Uninstallation Playbook
+# Usage: ansible-playbook -i inventory.ini uninstall-docker.yml
+
+- name: Uninstall Docker from all nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Stop Docker service
+      systemd:
+        name: docker
+        state: stopped
+      ignore_errors: yes
+
+    - name: Remove Docker packages (Debian/Ubuntu)
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - docker-ce-rootless-extras
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: absent
+        purge: yes
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove Docker packages (RHEL/CentOS)
+      yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - docker-ce-rootless-extras
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: absent
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Kill any remaining Docker processes
+      shell: |
+        pkill -9 docker || true
+        pkill -9 dockerd || true
+        pkill -9 containerd-shim || true
+      ignore_errors: yes
+
+    - name: Unmount Docker filesystems
+      shell: |
+        umount -f /var/run/docker/* 2>/dev/null || true
+        umount -f /var/lib/docker/* 2>/dev/null || true
+      ignore_errors: yes
+
+    - name: Remove Docker directories and files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/docker
+        - /var/lib/dockershim
+        - /etc/docker
+        - /var/run/docker.sock
+        - /var/run/docker
+      ignore_errors: yes
+
+    - name: Remove Docker repository (Debian/Ubuntu)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/docker.list
+        - /etc/apt/keyrings/docker.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove Docker repository (RHEL/CentOS)
+      file:
+        path: /etc/yum.repos.d/docker-ce.repo
+        state: absent
+      when: ansible_os_family == "RedHat"
+
+    - name: Update apt cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Verify Docker is removed
+      shell: which docker
+      register: docker_check
+      failed_when: false
+      changed_when: false
+
+    - name: Display uninstall status
+      debug:
+        msg: "Docker uninstalled: {{ 'Yes' if docker_check.rc != 0 else 'No - still found at ' + docker_check.stdout }}"

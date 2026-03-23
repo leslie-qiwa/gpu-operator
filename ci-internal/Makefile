@@ -1,6 +1,6 @@
 # CICD test image
 TEST_CONTAINER_URL ?= registry.test.pensando.io:5000/pensando/gpu-op
-TEST_CONTAINER_VERSION ?=1.9
+TEST_CONTAINER_VERSION ?=1.10
 
 install-docker:
 	mkdir tmp_pkgs; cd tmp_pkgs; \

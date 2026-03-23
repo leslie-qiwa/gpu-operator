@@ -7,9 +7,9 @@ function usage() {
     echo "Usage: $0 [options]"
     echo "          --help print help/usage information"
     echo "          --deployment <deployment> Eg: k8, openshift, standalone"
+    echo "          --k8-version <k8-version> Eg: 1.29.14 or 1.33.9, default 1.35.2"
     echo "          --app <app-name> Eg: gpu-operator, exporter, network-operator, debian, docker"
     echo "          --module <module-name>"
-    echo "          --type <selection: sanity|compat>"
     echo "          --registry <selection: local|master|global>"
     echo "          --testbed /path/to/testbed.json, default /warmd.json"
     echo "          --amdgpu-driver <selection: inbox|default-deviceconfig|{version} eg: 7.0.1>"
@@ -26,8 +26,8 @@ AMDGPU_DRIVER="default-deviceconfig"
 GEN_IMAGE_MANIFEST="/tmp/images.yaml"
 SEED_IMAGE_MANIFEST="/gpu-operator/ci-internal/sanity-images.yml"
 GLOBAL_REGISTRY="registry.test.pensando.io:5000"
-TYPE="NA"
 APP_NAME="NA"
+K8_VERSION="1.35.2"
 
 REGISTRY=""
 
@@ -161,9 +161,85 @@ function load_images() {
 
 function prepare_cluster() {
     echo "Run k8_jobd_ctl to "
-    echo "    (1) reboot worker-nodes"
-    echo "    (2) fetch kube-config"
+    echo "    (1) deploy k8"
+    echo "    (2) reboot worker-nodes"
+    echo "    (3) fetch kube-config"
     echo ""
+    jq .Instances[].RawJSON ${TESTBED_JSON} | tee /gpu-operator/tests/pytests/testbed.json
+    /gpu-operator/ci-internal/ansible/generate_inventory.py -i /gpu-operator/tests/pytests/testbed.json -o /gpu-operator/ci-internal/ansible/inventory.ini
+    RET=$?
+    if [[ "$RET" != "0" ]]
+    then
+        echo "FATAL ERROR: Could not generate inventory file"
+        exit $RET
+    fi
+    if [[ "${DEPLOYMENT}" == "k8" || "${DEPLOYMENT}" == "standalone" ]];
+    then
+        pushd /gpu-operator/ci-internal/ansible
+
+        # Step 1: Uninstall Docker
+        echo "Uninstalling Docker..."
+        ansible-playbook -i inventory.ini uninstall-docker.yml
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "WARNING: Docker uninstall had issues (may not be installed)"
+        fi
+
+        # Step 2: Uninstall GPU Operator if present
+        echo "Uninstalling GPU Operator..."
+        ansible-playbook -i inventory.ini uninstall-gpu-operator.yml
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "WARNING: GPU Operator uninstall had issues (may not be installed)"
+            # Don't exit - GPU operator might not be installed yet
+        fi
+
+        # Step 3: Uninstall K8s
+        echo "Uninstalling Kubernetes..."
+        ansible-playbook -i inventory.ini uninstall-k8s.yml
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "FATAL ERROR: Could not uninstall K8s"
+            exit $RET
+        fi
+        sleep 30
+
+        # Step 4: Install K8s
+        echo "Installing Kubernetes ${K8_VERSION}..."
+        ansible-playbook -i inventory.ini install-k8s.yml -e "k8s_version=${K8_VERSION}"
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "FATAL ERROR: Could not deploy K8s ${K8_VERSION} and build k8-cluster"
+            exit $RET
+        fi
+
+        # Step 5: Install Docker with insecure registry config
+        echo "Installing Docker..."
+        ansible-playbook -i inventory.ini install-docker.yml
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "FATAL ERROR: Could not install Docker"
+            exit $RET
+        fi
+
+        # Step 6: Install Prometheus (optional, non-fatal)
+        echo "Installing Prometheus Operator..."
+        ansible-playbook -i inventory.ini install-prometheus.yml
+        RET=$?
+        if [[ "$RET" != "0" ]]
+        then
+            echo "WARNING: Prometheus installation failed - continuing anyway"
+        else
+            echo "Prometheus installed successfully"
+        fi
+
+        popd
+    fi
     mkdir -p $HOME/.kube
     /gpu-operator/ci-internal/k8_jobd_ctl.py testbed --testbed $TESTBED_JSON --reboot-workers --fetch-kube-config --target $DEPLOYMENT
     RET=$?
@@ -173,7 +249,6 @@ function prepare_cluster() {
         exit $RET
     fi
     echo ""
-    jq .Instances[].RawJSON ${TESTBED_JSON} | tee /gpu-operator/tests/pytests/testbed.json
 }
 
 function launch_pytest_k8() {
@@ -319,10 +394,6 @@ while [[ $# -gt 0 ]]; do
             MODULE="$2"
             shift
         ;;
-        --type)
-            TYPE="$2"
-            shift
-        ;;
         --registry)
             REGISTRY_SELECTION="$2"
             shift
@@ -333,6 +404,10 @@ while [[ $# -gt 0 ]]; do
         ;;
         --amdgpu-driver)
             AMDGPU_DRIVER="$2"
+            shift
+        ;;
+        --k8-version)
+            K8_VERSION="$2"
             shift
         ;;
         --seed-image-manifest)
@@ -353,21 +428,9 @@ done
 
 function main() {
     prepare_cluster
-    if [[ "${TYPE}" == "sanity" ]];
-    then
-        echo "Running sanity-setup"
-        setup_registry
-        load_images
-        echo "Completed setting up registry and loading images"
-    elif [[ "${TYPE}" == "compat" ]];
-    then
-        echo "Running compat-setup"
-    else
-        echo "Invalid target type : ${TYPE} or is unspecified"
-        usage
-        exit 1
-    fi
-    echo "Completed setting up environment for ${TYPE}-run, launching pytest"
+    setup_registry
+    load_images
+    echo "Completed setting up environment for launching pytest"
     if [[ "${DEPLOYMENT}" == "k8" ]];
     then
         launch_pytest_k8

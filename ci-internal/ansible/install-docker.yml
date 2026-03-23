@@ -1,0 +1,182 @@
+---
+# Docker Installation Playbook
+# Usage: ansible-playbook -i inventory.ini install-docker.yml
+
+- name: Install Docker on all nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Create keyrings directory (Debian/Ubuntu)
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      when: ansible_os_family == "Debian"
+
+    - name: Determine Docker repository URL
+      set_fact:
+        docker_repo_url: "{{ 'https://download.docker.com/linux/debian' if ansible_distribution == 'Debian' else 'https://download.docker.com/linux/ubuntu' }}"
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker's official GPG key (Debian/Ubuntu)
+      get_url:
+        url: "{{ docker_repo_url }}/gpg"
+        dest: /tmp/docker-gpg-key
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key to keyring (Debian/Ubuntu)
+      shell: |
+        cat /tmp/docker-gpg-key | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+        chmod 644 /etc/apt/keyrings/docker.gpg
+      args:
+        creates: /etc/apt/keyrings/docker.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove old Docker repository file if exists
+      file:
+        path: /etc/apt/sources.list.d/docker.list
+        state: absent
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository (Debian/Ubuntu)
+      apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] {{ docker_repo_url }} {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+        update_cache: no
+      when: ansible_os_family == "Debian"
+
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+        cache_valid_time: 0
+      when: ansible_os_family == "Debian"
+      retries: 3
+      delay: 5
+      register: apt_update_result
+      until: apt_update_result is succeeded
+
+    - name: Add Docker repository (RHEL/CentOS)
+      yum_repository:
+        name: docker-ce
+        description: Docker CE Repository
+        baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/centos/gpg
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker packages (Debian/Ubuntu)
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker packages (RHEL/CentOS)
+      yum:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Create Docker config directory
+      file:
+        path: /etc/docker
+        state: directory
+        mode: '0755'
+
+    - name: Configure Docker daemon with insecure registry
+      copy:
+        dest: /etc/docker/daemon.json
+        content: |
+          {
+            "exec-opts": ["native.cgroupdriver=systemd"],
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "100m",
+              "max-file": "3"
+            },
+            "storage-driver": "overlay2",
+            "insecure-registries": [
+              "registry.test.pensando.io:5000"
+            ]
+          }
+        mode: '0644'
+
+    - name: Stop Docker service if running
+      systemd:
+        name: docker
+        state: stopped
+      ignore_errors: yes
+
+    - name: Stop Docker socket if running
+      systemd:
+        name: docker.socket
+        state: stopped
+      ignore_errors: yes
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Docker socket
+      systemd:
+        name: docker.socket
+        enabled: yes
+        state: started
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Wait for Docker socket to be ready
+      wait_for:
+        path: /var/run/docker.sock
+        state: present
+        timeout: 30
+
+    - name: Verify Docker is running
+      shell: systemctl is-active docker
+      register: docker_active
+      failed_when: docker_active.stdout != "active"
+      changed_when: false
+
+    - name: Get Docker version
+      shell: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Test Docker with hello-world
+      shell: docker run --rm hello-world
+      register: docker_test
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Display Docker status
+      debug:
+        msg:
+          - "Docker status: {{ docker_active.stdout }}"
+          - "Docker version: {{ docker_version.stdout }}"
+          - "Docker test: {{ 'Success' if docker_test.rc == 0 else 'Failed' }}"
+
+    - name: Add current user to docker group (optional)
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+      when: ansible_user != "root"
+      ignore_errors: yes

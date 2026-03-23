@@ -1,4 +1,4 @@
-from "registry.test.pensando.io:5000/pensando/gpu-op:1.9"
+from "registry.test.pensando.io:5000/pensando/gpu-op:1.10"
 
 user = getenv("USER")
 group = getenv("GROUP_NAME")

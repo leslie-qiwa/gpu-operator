@@ -279,8 +279,20 @@ jobs:
     labels: ["CI-Pytest-Operand-Release-v1.4.2"]
   tests/jobs/operand-release/v1.4.0.x:
     labels: ["CI-Pytest-Operand-Release-v1.4.0"]
-      # ci-internal:
-    #    labels: [""]
+  tests/jobs/k8s-compat/1.29.14:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.29"]
+  tests/jobs/k8s-compat/1.30.14:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.30"]
+  tests/jobs/k8s-compat/1.31.14:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.31"]
+  tests/jobs/k8s-compat/1.32.13:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.32"]
+  tests/jobs/k8s-compat/1.33.9:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.33"]
+  tests/jobs/k8s-compat/1.34.5:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.34"]
+  tests/jobs/k8s-compat/1.35.2:
+    labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.35"]
 host_mounts:
   "/sys/module": "/sys/module"
   "/lib/modules": "/lib/modules"

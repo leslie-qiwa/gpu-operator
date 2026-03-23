@@ -1,0 +1,363 @@
+---
+# Kubernetes Uninstallation Playbook
+# Usage: ansible-playbook -i inventory.ini uninstall-k8s.yml
+#
+# Note: This playbook removes Kubernetes and cert-manager.
+#       To remove GPU Operator first, run: ansible-playbook -i inventory.ini uninstall-gpu-operator.yml
+
+- name: Remove cert-manager
+  hosts: master
+  become: yes
+  tasks:
+    - name: Check if helm is installed
+      shell: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+
+    - name: Check if cert-manager namespace exists
+      shell: kubectl get namespace cert-manager
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: certmanager_ns_check
+      failed_when: false
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Uninstall cert-manager if present
+      shell: helm uninstall cert-manager -n cert-manager
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: helm_check.rc == 0 and certmanager_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Delete cert-manager namespace (fast, no wait)
+      shell: kubectl delete namespace cert-manager --wait=false
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: certmanager_ns_check.rc == 0
+      ignore_errors: yes
+
+- name: Drain and remove worker nodes
+  hosts: workers
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Get node name
+      shell: hostname
+      register: node_hostname
+
+    - name: Drain node (from master)
+      shell: |
+        kubectl drain {{ node_hostname.stdout }} --ignore-daemonsets --delete-emptydir-data --force
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      delegate_to: "{{ groups['master'][0] }}"
+      ignore_errors: yes
+
+    - name: Delete node from cluster (from master)
+      shell: kubectl delete node {{ node_hostname.stdout }}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      delegate_to: "{{ groups['master'][0] }}"
+      ignore_errors: yes
+
+- name: Reset Kubernetes on all nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Check if containerd socket exists
+      stat:
+        path: /run/containerd/containerd.sock
+      register: containerd_socket
+
+    - name: Check if crio socket exists
+      stat:
+        path: /var/run/crio/crio.sock
+      register: crio_socket
+
+    - name: Determine CRI socket (prefer containerd)
+      set_fact:
+        cri_socket: "{{ '/run/containerd/containerd.sock' if containerd_socket.stat.exists else ('/var/run/crio/crio.sock' if crio_socket.stat.exists else '') }}"
+
+    - name: Reset kubeadm with CRI socket
+      shell: kubeadm reset -f --cri-socket={{ cri_socket }}
+      when: cri_socket != ''
+      ignore_errors: yes
+
+    - name: Reset kubeadm (auto-detect CRI)
+      shell: kubeadm reset -f
+      when: cri_socket == ''
+      ignore_errors: yes
+
+    - name: Remove Kubernetes directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/kubernetes
+        - /var/lib/kubelet
+        - /var/lib/etcd
+        - /etc/cni/net.d
+        - /var/lib/cni
+        - /opt/cni
+        - /var/run/kubernetes
+        - "{{ ansible_env.HOME }}/.kube"
+        - /root/.kube
+
+    - name: Remove CNI network interfaces
+      shell: |
+        ip link delete cni0 2>/dev/null || true
+        ip link delete flannel.1 2>/dev/null || true
+        ip link delete tunl0 2>/dev/null || true
+        ip link delete cilium_host 2>/dev/null || true
+        ip link delete cilium_net 2>/dev/null || true
+        ip link delete cilium_vxlan 2>/dev/null || true
+      ignore_errors: yes
+
+    - name: Kill processes using Kubernetes ports
+      shell: |
+        # Kill processes on port 6443 (API server)
+        fuser -k 6443/tcp || true
+        # Kill processes on port 10250 (kubelet)
+        fuser -k 10250/tcp || true
+        # Kill processes on port 10259 (kube-scheduler)
+        fuser -k 10259/tcp || true
+        # Kill processes on port 10257 (kube-controller-manager)
+        fuser -k 10257/tcp || true
+        # Kill processes on port 2379-2380 (etcd)
+        fuser -k 2379/tcp || true
+        fuser -k 2380/tcp || true
+      ignore_errors: yes
+
+    - name: Remove iptables rules
+      shell: |
+        iptables -F
+        iptables -t nat -F
+        iptables -t mangle -F
+        iptables -X
+      ignore_errors: yes
+
+    - name: Stop and disable kubelet
+      systemd:
+        name: kubelet
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: Unhold Kubernetes packages (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove Kubernetes packages (Debian/Ubuntu)
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: absent
+        purge: yes
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove Kubernetes packages (RHEL/CentOS)
+      yum:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: absent
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Remove Kubernetes apt repository (Debian/Ubuntu)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/kubernetes.list
+        - /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove Kubernetes yum repository (RHEL/CentOS)
+      file:
+        path: /etc/yum.repos.d/kubernetes.repo
+        state: absent
+      when: ansible_os_family == "RedHat"
+
+    - name: Check if containerd service exists
+      shell: systemctl list-unit-files | grep containerd.service
+      register: containerd_service
+      failed_when: false
+      changed_when: false
+
+    - name: Stop and disable containerd
+      systemd:
+        name: containerd
+        state: stopped
+        enabled: no
+      when: containerd_service.rc == 0
+      ignore_errors: yes
+
+    - name: Check if crio service exists
+      shell: systemctl list-unit-files | grep crio.service
+      register: crio_service
+      failed_when: false
+      changed_when: false
+
+    - name: Stop and disable crio
+      systemd:
+        name: crio
+        state: stopped
+        enabled: no
+      when: crio_service.rc == 0
+      ignore_errors: yes
+
+    - name: Remove containerd packages (Debian/Ubuntu)
+      apt:
+        name:
+          - containerd.io
+          - containerd
+        state: absent
+        purge: yes
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove crio packages (Debian/Ubuntu)
+      apt:
+        name:
+          - cri-o
+          - cri-o-runc
+        state: absent
+        purge: yes
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove containerd packages (RHEL/CentOS)
+      yum:
+        name:
+          - containerd.io
+          - containerd
+        state: absent
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Remove crio packages (RHEL/CentOS)
+      yum:
+        name:
+          - cri-o
+        state: absent
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    # NOTE: Do not remove containerd directories as Docker may still need them.
+    # Docker installation happens after K8s installation and shares the same
+    # containerd.io package. Removing these directories would break Docker.
+
+    - name: Remove crio directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/crio
+        - /var/lib/crio
+        - /var/run/crio
+
+    - name: Remove Docker/containerd apt repository (Debian/Ubuntu)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/docker.list
+        - /etc/apt/keyrings/docker.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove CRI-O repositories (Debian/Ubuntu)
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/devel:kubic:libcontainers:stable.list
+        - /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:1.28.list
+        - /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:1.29.list
+        - /etc/apt/sources.list.d/devel:kubic:libcontainers:stable:cri-o:1.30.list
+        - /etc/apt/sources.list.d/libcontainers.list
+        - /usr/share/keyrings/libcontainers-archive-keyring.gpg
+        - /usr/share/keyrings/libcontainers-crio-archive-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Remove any other CRI-O related apt sources
+      shell: |
+        rm -f /etc/apt/sources.list.d/*cri-o* /etc/apt/sources.list.d/*libcontainers* /etc/apt/sources.list.d/*kubic*
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Remove kernel modules configuration
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/modules-load.d/k8s.conf
+        - /etc/modules-load.d/containerd.conf
+
+    - name: Remove sysctl configuration
+      file:
+        path: /etc/sysctl.d/k8s.conf
+        state: absent
+
+    - name: Clean up temporary files
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/k8s-join-command.sh
+        - /tmp/kubernetes-apt-keyring.key
+
+    - name: Clean apt lists (Debian/Ubuntu)
+      shell: rm -rf /var/lib/apt/lists/*
+      when: ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Update apt cache (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+        cache_valid_time: 0
+      when: ansible_os_family == "Debian"
+      retries: 3
+      delay: 5
+      register: apt_result
+      until: apt_result is succeeded
+      ignore_errors: yes
+
+    - name: Clean yum cache (RHEL/CentOS)
+      shell: yum clean all
+      when: ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+- name: Final cleanup verification
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Verify Kubernetes processes are stopped
+      shell: ps aux | grep -E 'kube|etcd|containerd' | grep -v grep
+      register: k8s_processes
+      failed_when: false
+      changed_when: false
+
+    - name: Display remaining Kubernetes processes (if any)
+      debug:
+        msg: "{{ k8s_processes.stdout_lines }}"
+      when: k8s_processes.stdout != ""
+
+    - name: Reboot prompt
+      debug:
+        msg: "Kubernetes has been uninstalled. Consider rebooting the nodes to ensure all resources are freed."

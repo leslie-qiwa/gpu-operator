@@ -584,6 +584,125 @@ def _upload_crio_registry_conf(logger, registry, testbed_info):
         # Ignore error as image cleanup would fail as some images are still in use
     return 0
 
+def _upload_containerd_registry_conf(logger, registry, testbed_info):
+    """
+    Updates containerd configuration to add insecure registry using hosts.toml (v2.x strict mode).
+
+    This function adds the dynamic test registry passed via --registry flag.
+    It also ensures registry.test.pensando.io:5000 is configured (defensive check).
+
+    Args:
+        logger: Logger instance
+        registry (str): The hostname:port of the dynamic test registry
+        testbed_info: Testbed information containing node details
+
+    Returns:
+        0 on success, non-zero on failure
+    """
+    # Define the output directory
+    output_directory = os.path.join(os.getenv("PWD"), "logs")
+    os.makedirs(output_directory, exist_ok=True)
+
+    # Permanent registry (should be configured by Ansible, but we check defensively)
+    permanent_registry = "registry.test.pensando.io:5000"
+
+    # Build list of registries to ensure are configured
+    registries_to_check = [permanent_registry]
+    if registry and registry != permanent_registry:
+        registries_to_check.append(registry)
+
+    masters = _get_master_nodes(testbed_info)
+    workers = _get_worker_nodes(testbed_info)
+
+    cmd_daemon = ["sudo", "systemctl", "daemon-reload"]
+    cmd_containerd = ["sudo", "systemctl", "restart", "containerd"]
+    cmd_kubelet = ["sudo", "systemctl", "restart", "kubelet"]
+    cmd_img_cleanup = ["sudo", "crictl", "rmi", "-a"]
+    cmd_verify_containerd = ["sudo", "systemctl", "is-active", "containerd"]
+
+    for node in masters + workers:
+        registries_added = []
+
+        for reg in registries_to_check:
+            # Check if hosts.toml already exists for this registry
+            hosts_toml_path = f"/etc/containerd/certs.d/{reg}/hosts.toml"
+            check_cmd = ["sudo", "test", "-f", hosts_toml_path]
+            result = run_command(node, " ".join(check_cmd))
+
+            if result.return_code == 0:
+                logger.info(f"Registry {reg} already configured (hosts.toml exists) on {node['ip']}")
+                continue
+
+            # Create registry directory
+            mkdir_cmd = ["sudo", "mkdir", "-p", f"/etc/containerd/certs.d/{reg}"]
+            result = run_command(node, " ".join(mkdir_cmd))
+            if result.return_code != 0:
+                logger.error(f"Failed to create directory for {reg} on {node['ip']}")
+                return result.return_code
+
+            # Generate hosts.toml content (containerd v2.x strict mode)
+            hosts_content = f"""server = "http://{reg}"
+
+[host."http://{reg}"]
+  capabilities = ["pull", "resolve"]
+
+[host."{reg}"]
+  capabilities = ["pull", "resolve"]
+"""
+
+            # Write to local temp file
+            local_hosts_file = os.path.join(output_directory, f"hosts-{reg.replace(':', '_')}.toml")
+            with open(local_hosts_file, "w") as f:
+                f.write(hosts_content)
+
+            # Upload hosts.toml
+            result = put(node, local_hosts_file, hosts_toml_path, sudo=True)
+            if result.return_code != 0:
+                logger.error(f"Failed to upload hosts.toml for {reg} to {node['ip']}")
+                return result.return_code
+
+            registries_added.append(reg)
+            logger.info(f"Added registry {reg} via hosts.toml on {node['ip']}")
+
+        if not registries_added:
+            logger.info(f"No new registries to add on {node['ip']}")
+            continue  # Skip restart if no changes
+
+        # Reload daemon
+        result = run_command(node, " ".join(cmd_daemon))
+        if result.return_code != 0:
+            logger.error(f"Failed systemctl daemon-reload on {node['ip']}")
+            return result.return_code
+
+        # Restart containerd
+        result = run_command(node, " ".join(cmd_containerd))
+        if result.return_code != 0:
+            logger.error(f"Failed to restart containerd on {node['ip']}")
+            return result.return_code
+
+        # Restart kubelet
+        result = run_command(node, " ".join(cmd_kubelet))
+        if result.return_code != 0:
+            logger.error(f"Failed to restart kubelet on {node['ip']}")
+            return result.return_code
+
+        # Verify containerd is running correctly
+        result = run_command(node, " ".join(cmd_verify_containerd))
+        if result.return_code != 0 or result.stdout.strip() != "active":
+            logger.error(f"Containerd is not active on {node['ip']} after restart")
+            return 1
+
+        logger.info(f"Containerd verified active on {node['ip']}")
+
+        # Cleanup images (ignore errors)
+        result = run_command(node, " ".join(cmd_img_cleanup))
+        # Ignore error as image cleanup would fail as some images are still in use
+
+        logger.info(f"Successfully configured {len(registries_added)} registries on {node['ip']}: {', '.join(registries_added)}")
+
+    logger.info("Containerd registry configuration completed successfully")
+    return 0
+
 def _pull_images(logger, node, image_manifest_file, target):
     from ruamel.yaml import YAML
     yaml = YAML()
@@ -708,6 +827,10 @@ def _run_image_commands(logger):
                 logger.info("Successfully uploaded new /etc/containers/registries.conf.d/runner-registry.conf to all nodes")
             else:
                 logger.warning(f"Failed to upload /etc/containers/registries.conf.d/runner-registry.conf to all nodes - ignoring")
+            if _upload_containerd_registry_conf(logger, GlobalOptions.registry, testbed_info) == 0:
+                logger.info("Successfully updated containerd registry configuration on all nodes")
+            else:
+                logger.warning(f"Failed to update containerd registry configuration on all nodes - ignoring")
         elif GlobalOptions.target in ["openshift"]:
             # Patch machine-config on openshift cluster to make regsitry insecure
 

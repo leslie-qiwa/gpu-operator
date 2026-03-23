@@ -1,0 +1,23 @@
+{
+  "name": "mi200-testbed",
+  "deployment": "k8",
+  "instances": [
+    {
+      "ip": "10.11.78.80",
+      "type": "master",
+      "username": "vm",
+      "password": "vm",
+      "registry": "yes",
+      "comment": "username 'vm' is a sudoer with password authentication"
+    },
+    {
+      "ip": "10.11.130.28",
+      "type": "worker",
+      "username": "vm",
+      "password": "vm",
+      "gpu_series": "MI200",
+      "gpu_count": 1,
+      "comment": "username 'vm' is a sudoer with password authentication"
+    }
+  ]
+}

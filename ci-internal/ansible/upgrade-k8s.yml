@@ -1,0 +1,254 @@
+---
+# Kubernetes Upgrade Playbook
+# Usage: ansible-playbook -i inventory.ini upgrade-k8s.yml -e "k8s_version=1.30.0"
+
+- name: Upgrade Kubernetes control plane
+  hosts: master
+  become: yes
+  serial: 1
+  tasks:
+    - name: Set k8s_version if not provided
+      set_fact:
+        k8s_version: "{{ k8s_version | default('1.30.0') }}"
+
+    - name: Validate Kubernetes version
+      assert:
+        that:
+          - k8s_version is version('1.29.0', '>=')
+          - k8s_version is version('1.36.0', '<')
+        fail_msg: "Kubernetes version must be between 1.29.0 and 1.35.x"
+
+    - name: Get current Kubernetes version
+      shell: kubectl version --short | grep Server | awk '{print $3}' | sed 's/v//'
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: current_k8s_version
+
+    - name: Display current version
+      debug:
+        msg: "Current Kubernetes version: {{ current_k8s_version.stdout }}, Target version: {{ k8s_version }}"
+
+    - name: Unhold kubeadm package (Debian/Ubuntu)
+      dpkg_selections:
+        name: kubeadm
+        selection: install
+      when: ansible_os_family == "Debian"
+
+    - name: Update kubeadm (Debian/Ubuntu)
+      apt:
+        name: "kubeadm={{ k8s_version }}-*"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Update kubeadm (RHEL/CentOS)
+      yum:
+        name: "kubeadm-{{ k8s_version }}"
+        state: present
+        disable_excludes: kubernetes
+      when: ansible_os_family == "RedHat"
+
+    - name: Hold kubeadm package (Debian/Ubuntu)
+      dpkg_selections:
+        name: kubeadm
+        selection: hold
+      when: ansible_os_family == "Debian"
+
+    - name: Verify kubeadm version
+      shell: kubeadm version -o short
+      register: kubeadm_version
+
+    - name: Display kubeadm version
+      debug:
+        msg: "kubeadm version: {{ kubeadm_version.stdout }}"
+
+    - name: Drain control plane node
+      shell: kubectl drain {{ ansible_hostname }} --ignore-daemonsets --delete-emptydir-data
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      ignore_errors: yes
+
+    - name: Upgrade control plane
+      shell: kubeadm upgrade apply v{{ k8s_version }} -y
+      register: upgrade_result
+
+    - name: Display upgrade result
+      debug:
+        msg: "{{ upgrade_result.stdout_lines }}"
+
+    - name: Uncordon control plane node
+      shell: kubectl uncordon {{ ansible_hostname }}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+
+    - name: Unhold kubelet and kubectl (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - kubelet
+        - kubectl
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade kubelet and kubectl (Debian/Ubuntu)
+      apt:
+        name:
+          - "kubelet={{ k8s_version }}-*"
+          - "kubectl={{ k8s_version }}-*"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade kubelet and kubectl (RHEL/CentOS)
+      yum:
+        name:
+          - "kubelet-{{ k8s_version }}"
+          - "kubectl-{{ k8s_version }}"
+        state: present
+        disable_excludes: kubernetes
+      when: ansible_os_family == "RedHat"
+
+    - name: Hold kubelet and kubectl (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubectl
+      when: ansible_os_family == "Debian"
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: yes
+
+    - name: Wait for control plane to be ready
+      shell: kubectl get nodes {{ ansible_hostname }} | grep -w Ready
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: node_ready
+      until: node_ready.rc == 0
+      retries: 20
+      delay: 10
+
+- name: Upgrade worker nodes
+  hosts: workers
+  become: yes
+  serial: 1
+  tasks:
+    - name: Drain worker node
+      shell: kubectl drain {{ ansible_hostname }} --ignore-daemonsets --delete-emptydir-data --force
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      delegate_to: "{{ groups['master'][0] }}"
+      ignore_errors: yes
+
+    - name: Unhold kubeadm package (Debian/Ubuntu)
+      dpkg_selections:
+        name: kubeadm
+        selection: install
+      when: ansible_os_family == "Debian"
+
+    - name: Update kubeadm (Debian/Ubuntu)
+      apt:
+        name: "kubeadm={{ k8s_version }}-*"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Update kubeadm (RHEL/CentOS)
+      yum:
+        name: "kubeadm-{{ k8s_version }}"
+        state: present
+        disable_excludes: kubernetes
+      when: ansible_os_family == "RedHat"
+
+    - name: Hold kubeadm package (Debian/Ubuntu)
+      dpkg_selections:
+        name: kubeadm
+        selection: hold
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade kubelet config
+      shell: kubeadm upgrade node
+
+    - name: Unhold kubelet and kubectl (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: install
+      loop:
+        - kubelet
+        - kubectl
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade kubelet and kubectl (Debian/Ubuntu)
+      apt:
+        name:
+          - "kubelet={{ k8s_version }}-*"
+          - "kubectl={{ k8s_version }}-*"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Upgrade kubelet and kubectl (RHEL/CentOS)
+      yum:
+        name:
+          - "kubelet-{{ k8s_version }}"
+          - "kubectl-{{ k8s_version }}"
+        state: present
+        disable_excludes: kubernetes
+      when: ansible_os_family == "RedHat"
+
+    - name: Hold kubelet and kubectl (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubectl
+      when: ansible_os_family == "Debian"
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: yes
+
+    - name: Uncordon worker node
+      shell: kubectl uncordon {{ ansible_hostname }}
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      delegate_to: "{{ groups['master'][0] }}"
+
+    - name: Wait for worker node to be ready
+      shell: kubectl get nodes {{ ansible_hostname }} | grep -w Ready
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      delegate_to: "{{ groups['master'][0] }}"
+      register: node_ready
+      until: node_ready.rc == 0
+      retries: 20
+      delay: 10
+
+- name: Verify cluster upgrade
+  hosts: master
+  become: yes
+  tasks:
+    - name: Get all nodes status
+      shell: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: nodes_status
+
+    - name: Display nodes status
+      debug:
+        msg: "{{ nodes_status.stdout_lines }}"
+
+    - name: Get cluster version
+      shell: kubectl version --short
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: cluster_version
+
+    - name: Display cluster version
+      debug:
+        msg: "{{ cluster_version.stdout_lines }}"

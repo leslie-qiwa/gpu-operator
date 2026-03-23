@@ -1,0 +1,175 @@
+---
+# Prometheus Operator Installation Playbook
+# Usage: ansible-playbook -i inventory.ini install-prometheus.yml
+
+- name: Install Prometheus Operator using Helm
+  hosts: master
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Check if helm is installed
+      shell: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if helm is not installed
+      fail:
+        msg: "Helm is not installed. Please install Helm first."
+      when: helm_check.rc != 0
+
+    - name: Check if kubectl is configured
+      shell: kubectl cluster-info
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: kubectl_check
+      failed_when: false
+      changed_when: false
+
+    - name: Fail if kubectl is not configured
+      fail:
+        msg: "kubectl is not configured properly. Please ensure Kubernetes is running."
+      when: kubectl_check.rc != 0
+
+    - name: Add Prometheus Helm repository
+      shell: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: helm_repo_add
+      changed_when: "'already exists' not in helm_repo_add.stderr"
+      failed_when: helm_repo_add.rc != 0 and 'already exists' not in helm_repo_add.stderr
+
+    - name: Update Helm repositories
+      shell: helm repo update
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      changed_when: false
+
+    - name: Check if monitoring namespace exists
+      shell: kubectl get namespace monitoring
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: monitoring_ns
+      failed_when: false
+      changed_when: false
+
+    - name: Create monitoring namespace
+      shell: kubectl create namespace monitoring
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: monitoring_ns.rc != 0
+
+    - name: Check if Prometheus is already installed
+      shell: helm list -n monitoring | grep prometheus
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_installed
+      failed_when: false
+      changed_when: false
+
+    - name: Install/Upgrade Prometheus stack using Helm
+      shell: |
+        helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+          --namespace monitoring \
+          --create-namespace \
+          --set prometheus.prometheusSpec.storageSpec=null \
+          --set alertmanager.alertmanagerSpec.storage=null
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_deploy
+      failed_when: prometheus_deploy.rc != 0 and 'already exists' not in prometheus_deploy.stderr
+
+    - name: Wait for Prometheus pods to be ready
+      shell: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=prometheus -n monitoring --timeout=120s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_ready
+      retries: 1
+      delay: 10
+      until: prometheus_ready.rc == 0
+      ignore_errors: yes
+
+    - name: Verify Prometheus CRDs are installed
+      shell: kubectl get crds | grep monitoring
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_crds
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Get Prometheus pods status
+      shell: kubectl get pods -n monitoring
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_pods
+      changed_when: false
+
+    - name: Get Prometheus service
+      shell: kubectl get svc -n monitoring
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: prometheus_svc
+      changed_when: false
+
+    - name: Display Prometheus deployment status
+      debug:
+        msg:
+          - "Prometheus CRDs:"
+          - "{{ prometheus_crds.stdout_lines }}"
+          - ""
+          - "Prometheus Stack Pods:"
+          - "{{ prometheus_pods.stdout_lines }}"
+          - ""
+          - "Prometheus Stack Services:"
+          - "{{ prometheus_svc.stdout_lines }}"
+          - ""
+          - "Access Prometheus:"
+          - "  kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090"
+          - "  Then visit: http://localhost:9090"
+          - ""
+          - "Access Grafana:"
+          - "  kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80"
+          - "  Then visit: http://localhost:3000 (admin/prom-operator)"
+
+    - name: Create instructions file
+      copy:
+        dest: /tmp/prometheus-access.txt
+        content: |
+          Kube Prometheus Stack has been installed successfully!
+
+          Namespace: monitoring
+
+          Components Deployed:
+          - Prometheus Operator
+          - Prometheus Server
+          - Grafana
+          - Alertmanager
+          - Kube State Metrics
+          - Node Exporter
+
+          Access Prometheus:
+            kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+            Then visit: http://localhost:9090
+
+          Access Grafana:
+            kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+            Then visit: http://localhost:3000
+            Default credentials: admin / prom-operator
+
+          Access Alertmanager:
+            kubectl port-forward -n monitoring svc/kube-prometheus-stack-alertmanager 9093:9093
+            Then visit: http://localhost:9093
+
+          Check Prometheus pods:
+            kubectl get pods -n monitoring
+
+          Check Prometheus services:
+            kubectl get svc -n monitoring
+
+          Uninstall Prometheus:
+            helm uninstall kube-prometheus-stack -n monitoring
+        mode: '0644'
+
+    - name: Display access instructions
+      debug:
+        msg: "Prometheus access instructions saved to /tmp/prometheus-access.txt"

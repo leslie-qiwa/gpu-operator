@@ -1,0 +1,179 @@
+---
+# GPU Operator Uninstallation Playbook
+# Usage: ansible-playbook -i inventory.ini uninstall-gpu-operator.yml
+
+- name: Remove GPU operator
+  hosts: master
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Check if helm is installed
+      shell: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+
+    - name: Check if jq is installed
+      shell: which jq
+      register: jq_check
+      failed_when: false
+      changed_when: false
+
+    - name: Install jq if not present (Debian/Ubuntu)
+      apt:
+        name: jq
+        state: present
+      when: jq_check.rc != 0 and ansible_os_family == "Debian"
+      ignore_errors: yes
+
+    - name: Install jq if not present (RHEL/CentOS)
+      yum:
+        name: jq
+        state: present
+      when: jq_check.rc != 0 and ansible_os_family == "RedHat"
+      ignore_errors: yes
+
+    - name: Check if GPU operator namespace exists
+      shell: kubectl get namespace kube-amd-gpu
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: gpu_ns_check
+      failed_when: false
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Get GPU operator helm release
+      shell: helm list -n kube-amd-gpu | grep amd-gpu-operator
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: gpu_helm_check
+      failed_when: false
+      changed_when: false
+      when: helm_check.rc == 0 and gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Uninstall GPU operator if present
+      shell: helm uninstall amd-gpu-operator -n kube-amd-gpu
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: helm_check.rc == 0 and gpu_ns_check.rc == 0 and gpu_helm_check.rc == 0
+      ignore_errors: yes
+
+    - name: Get all GPU operator CRD instances
+      shell: |
+        kubectl get deviceconfigs.amd.com -A -o name 2>/dev/null || true
+        kubectl get amdgpus.amd.com -A -o name 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: gpu_crd_instances
+      changed_when: false
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Remove finalizers from GPU operator CRD instances
+      shell: |
+        for resource in $(kubectl get deviceconfigs.amd.com -A -o name 2>/dev/null); do
+          kubectl patch $resource -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+        done
+        for resource in $(kubectl get amdgpus.amd.com -A -o name 2>/dev/null); do
+          kubectl patch $resource -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+        done
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0 and gpu_crd_instances.stdout != ""
+      ignore_errors: yes
+
+    - name: Delete GPU operator CRD instances
+      shell: |
+        kubectl delete deviceconfigs.amd.com --all -A --timeout=30s 2>/dev/null || true
+        kubectl delete amdgpus.amd.com --all -A --timeout=30s 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Remove finalizers from all pods in namespace
+      shell: |
+        kubectl get pods -n kube-amd-gpu -o name 2>/dev/null | while read pod; do
+          kubectl patch $pod -n kube-amd-gpu -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+        done
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Remove finalizers from namespace resources
+      shell: |
+        kubectl get all -n kube-amd-gpu -o name 2>/dev/null | while read resource; do
+          kubectl patch $resource -n kube-amd-gpu -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+        done
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Force delete all pods in namespace
+      shell: kubectl delete pods --all -n kube-amd-gpu --grace-period=0 --force --timeout=30s 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Wait for GPU operator pods to terminate
+      shell: kubectl get pods -n kube-amd-gpu --no-headers 2>/dev/null | wc -l
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: gpu_pods
+      until: gpu_pods.stdout == "0"
+      retries: 10
+      delay: 5
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Delete daemonsets and deployments with force
+      shell: |
+        kubectl delete daemonsets --all -n kube-amd-gpu --grace-period=0 --force --timeout=30s 2>/dev/null || true
+        kubectl delete deployments --all -n kube-amd-gpu --grace-period=0 --force --timeout=30s 2>/dev/null || true
+        kubectl delete statefulsets --all -n kube-amd-gpu --grace-period=0 --force --timeout=30s 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Force delete namespace if stuck (using jq)
+      shell: |
+        kubectl get namespace kube-amd-gpu -o json 2>/dev/null | \
+        jq '.spec.finalizers = []' | \
+        kubectl replace --raw /api/v1/namespaces/kube-amd-gpu/finalize -f - 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0 and jq_check.rc == 0
+      ignore_errors: yes
+
+    - name: Force delete namespace if stuck (without jq)
+      shell: |
+        kubectl patch namespace kube-amd-gpu -p '{"metadata":{"finalizers":[]}}' --type=merge 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0 and jq_check.rc != 0
+      ignore_errors: yes
+
+    - name: Delete GPU operator namespace
+      shell: kubectl delete namespace kube-amd-gpu --timeout=60s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: gpu_ns_check.rc == 0
+      ignore_errors: yes
+
+    - name: Delete GPU operator CRDs
+      shell: |
+        kubectl delete crd deviceconfigs.amd.com --timeout=30s 2>/dev/null || true
+        kubectl delete crd amdgpus.amd.com --timeout=30s 2>/dev/null || true
+        kubectl delete crd $(kubectl get crd -o name | grep 'amd.com' | grep -v 'deviceconfigs\|amdgpus') --timeout=30s 2>/dev/null || true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      ignore_errors: yes
+
+    - name: Display completion message
+      debug:
+        msg: "GPU Operator uninstalled successfully"

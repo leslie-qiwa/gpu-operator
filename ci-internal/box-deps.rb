@@ -49,6 +49,12 @@ run "pip install xmltodict prometheus_client docker tomlkit"
 run "apt update && apt install uuid-runtime"
 run "pip install pytest-metadata"
 
+# install ansible
+run "apt update"
+run "apt install -y software-properties-common"
+run "add-apt-repository --yes --update ppa:ansible/ansible"
+run "apt install -y ansible"
+
 if getenv("FLATTEN") != ""
   flatten
 end

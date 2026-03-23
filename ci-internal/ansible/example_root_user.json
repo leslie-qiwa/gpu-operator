@@ -1,0 +1,23 @@
+{
+  "name": "root-cluster",
+  "deployment": "k8",
+  "instances": [
+    {
+      "ip": "10.11.78.80",
+      "type": "master",
+      "username": "root",
+      "password": "RootPass123",
+      "registry": "yes",
+      "comment": "root user - no sudo needed"
+    },
+    {
+      "ip": "10.11.130.28",
+      "type": "worker",
+      "username": "root",
+      "password": "RootPass123",
+      "gpu_series": "MI200",
+      "gpu_count": 1,
+      "comment": "root user - no sudo needed"
+    }
+  ]
+}

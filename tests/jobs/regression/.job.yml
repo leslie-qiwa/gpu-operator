@@ -15,7 +15,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app gpu-operator \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -46,7 +46,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app gpu-operator \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         -type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -77,7 +77,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app gpu-operator \
-         --type sanity --testbed /warmd.json --amdgpu-driver inbox"
+         --testbed /warmd.json --amdgpu-driver inbox"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -107,7 +107,7 @@ e2e-targets:
               #      "/bin/sh",
               #      "-c",
               #      "cat /warmd.json && cd /gpu-operator/tests/pytests && \
-              #       /gpu-operator/ci-internal/run_sanity.sh --app exporter --type sanity --testbed /warmd.json --amdgpu-driver inbox"
+              #       /gpu-operator/ci-internal/run_sanity.sh --app exporter --testbed /warmd.json --amdgpu-driver inbox"
               #  ]
               #  owners: ["email:srivatsa.sangli@amd.com"]
               #  tcp-ports: [5000]
@@ -137,7 +137,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app exporter \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -165,7 +165,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app exporter \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -193,7 +193,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app exporter \
-         --type sanity --testbed /warmd.json --amdgpu-driver inbox"
+         --testbed /warmd.json --amdgpu-driver inbox"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -221,7 +221,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment standalone --app debian \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -249,7 +249,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment standalone --app debian \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -277,7 +277,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment standalone --app docker \
-         --type sanity --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
@@ -304,7 +304,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment openshift --app gpu-operator \
-         --type sanity --registry local --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --registry local --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]

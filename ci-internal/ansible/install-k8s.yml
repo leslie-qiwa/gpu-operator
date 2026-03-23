@@ -1,0 +1,512 @@
+---
+# Kubernetes Installation Playbook
+# Usage: ansible-playbook -i inventory.ini install-k8s.yml -e "k8s_version=1.29.0"
+
+- name: Prepare all nodes for Kubernetes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Set k8s_version if not provided
+      set_fact:
+        k8s_version: "{{ k8s_version | default('1.29.0') }}"
+
+    - name: Validate Kubernetes version
+      assert:
+        that:
+          - k8s_version is version('1.29.0', '>=')
+          - k8s_version is version('1.36.0', '<')
+        fail_msg: "Kubernetes version must be between 1.29.0 and 1.35.x"
+
+    - name: Disable swap
+      shell: |
+        swapoff -a
+        sed -i '/swap/d' /etc/fstab
+      ignore_errors: yes
+
+    - name: Load required kernel modules
+      copy:
+        dest: /etc/modules-load.d/k8s.conf
+        content: |
+          overlay
+          br_netfilter
+
+    - name: Load kernel modules now
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - overlay
+        - br_netfilter
+
+    - name: Set sysctl parameters for Kubernetes
+      copy:
+        dest: /etc/sysctl.d/k8s.conf
+        content: |
+          net.bridge.bridge-nf-call-iptables  = 1
+          net.bridge.bridge-nf-call-ip6tables = 1
+          net.ipv4.ip_forward                 = 1
+
+    - name: Apply sysctl parameters
+      command: sysctl --system
+
+    - name: Make /sys a shared mount (required for Calico and some CNI plugins)
+      shell: |
+        mount --make-rshared /sys || true
+        mount --make-rshared / || true
+      ignore_errors: yes
+
+    - name: Add shared mount to systemd for persistence
+      copy:
+        dest: /etc/systemd/system/make-shared-mount.service
+        content: |
+          [Unit]
+          Description=Make root and sys mounts shared
+          DefaultDependencies=no
+          Before=kubelet.service
+          After=local-fs.target
+
+          [Service]
+          Type=oneshot
+          ExecStart=/bin/bash -c 'mount --make-rshared / || true; mount --make-rshared /sys || true'
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Enable shared mount service
+      systemd:
+        name: make-shared-mount
+        enabled: yes
+        daemon_reload: yes
+
+    - name: Install required packages (Debian/Ubuntu)
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages (RHEL/CentOS)
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+          - curl
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install containerd
+      include_tasks: tasks/install-containerd.yml
+
+    - name: Create keyrings directory (Debian/Ubuntu)
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      when: ansible_os_family == "Debian"
+
+    - name: Add Kubernetes apt repository key (Debian/Ubuntu)
+      get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version.split('.')[0] }}.{{ k8s_version.split('.')[1] }}/deb/Release.key"
+        dest: /tmp/kubernetes-apt-keyring.key
+      when: ansible_os_family == "Debian"
+
+    - name: Add Kubernetes apt repository key to keyring (Debian/Ubuntu)
+      shell: |
+        cat /tmp/kubernetes-apt-keyring.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      when: ansible_os_family == "Debian"
+
+    - name: Add Kubernetes apt repository (Debian/Ubuntu)
+      apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v{{ k8s_version.split('.')[0] }}.{{ k8s_version.split('.')[1] }}/deb/ /"
+        state: present
+        filename: kubernetes
+      when: ansible_os_family == "Debian"
+
+    - name: Add Kubernetes yum repository (RHEL/CentOS)
+      yum_repository:
+        name: kubernetes
+        description: Kubernetes Repository
+        baseurl: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version.split('.')[0] }}.{{ k8s_version.split('.')[1] }}/rpm/"
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version.split('.')[0] }}.{{ k8s_version.split('.')[1] }}/rpm/repodata/repomd.xml.key"
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Kubernetes packages (Debian/Ubuntu)
+      apt:
+        name:
+          - "kubelet={{ k8s_version }}-*"
+          - "kubeadm={{ k8s_version }}-*"
+          - "kubectl={{ k8s_version }}-*"
+        state: present
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Install Kubernetes packages (RHEL/CentOS)
+      yum:
+        name:
+          - "kubelet-{{ k8s_version }}"
+          - "kubeadm-{{ k8s_version }}"
+          - "kubectl-{{ k8s_version }}"
+        state: present
+        disable_excludes: kubernetes
+      when: ansible_os_family == "RedHat"
+
+    - name: Hold Kubernetes packages at current version (Debian/Ubuntu)
+      dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
+      when: ansible_os_family == "Debian"
+
+    - name: Enable and start kubelet
+      systemd:
+        name: kubelet
+        enabled: yes
+        state: started
+
+- name: Initialize Kubernetes master
+  hosts: master
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Check if Kubernetes is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: k8s_initialized
+
+    - name: Check if containerd socket exists
+      stat:
+        path: /run/containerd/containerd.sock
+      register: containerd_socket
+
+    - name: Check if crio socket exists
+      stat:
+        path: /var/run/crio/crio.sock
+      register: crio_socket
+
+    - name: Determine CRI socket (prefer containerd)
+      set_fact:
+        cri_socket: "{{ '/run/containerd/containerd.sock' if containerd_socket.stat.exists else ('/var/run/crio/crio.sock' if crio_socket.stat.exists else '') }}"
+
+    - name: Display selected CRI socket
+      debug:
+        msg: "Using CRI socket: {{ cri_socket if cri_socket != '' else 'auto-detect' }}"
+
+    - name: Check if port 6443 is in use
+      shell: netstat -tuln | grep :6443 || true
+      register: port_check
+      changed_when: false
+
+    - name: Kill processes on port 6443 if in use
+      shell: fuser -k 6443/tcp || true
+      when: port_check.stdout != "" and not k8s_initialized.stat.exists
+      ignore_errors: yes
+
+    - name: Wait for port 6443 to be free
+      wait_for:
+        port: 6443
+        state: stopped
+        timeout: 30
+      when: not k8s_initialized.stat.exists
+      ignore_errors: yes
+
+    - name: Initialize Kubernetes cluster with containerd
+      shell: |
+        kubeadm init \
+          --kubernetes-version={{ k8s_version }} \
+          --pod-network-cidr={{ pod_network_cidr }} \
+          --service-cidr={{ service_cidr }} \
+          --cri-socket={{ cri_socket }} \
+          --upload-certs
+      register: kubeadm_init
+      when: not k8s_initialized.stat.exists and cri_socket != ''
+
+    - name: Initialize Kubernetes cluster (auto-detect CRI)
+      shell: |
+        kubeadm init \
+          --kubernetes-version={{ k8s_version }} \
+          --pod-network-cidr={{ pod_network_cidr }} \
+          --service-cidr={{ service_cidr }} \
+          --upload-certs
+      register: kubeadm_init_auto
+      when: not k8s_initialized.stat.exists and cri_socket == ''
+
+    - name: Create .kube directory for root
+      file:
+        path: /root/.kube
+        state: directory
+        mode: '0755'
+
+    - name: Copy admin.conf to root user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /root/.kube/config
+        remote_src: yes
+        mode: '0600'
+
+    - name: Create .kube directory for non-root user
+      file:
+        path: "{{ ansible_env.HOME }}/.kube"
+        state: directory
+        mode: '0755'
+      when: ansible_user != 'root'
+
+    - name: Copy admin.conf to non-root user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ ansible_env.HOME }}/.kube/config"
+        remote_src: yes
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: '0600'
+      when: ansible_user != 'root'
+
+    - name: Install network plugin - Calico
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: network_plugin == "calico" and not k8s_initialized.stat.exists
+
+    - name: Install network plugin - Flannel
+      shell: |
+        kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: network_plugin == "flannel" and not k8s_initialized.stat.exists
+
+    - name: Install network plugin - Cilium
+      shell: |
+        CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+        CLI_ARCH=amd64
+        if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+        curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+        sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+        tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+        rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+        cilium install
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: network_plugin == "cilium" and not k8s_initialized.stat.exists
+
+    - name: Wait for API server to be ready
+      shell: kubectl get nodes
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: api_check
+      retries: 30
+      delay: 10
+      until: api_check.rc == 0
+      ignore_errors: yes
+
+    - name: Get join command
+      shell: kubeadm token create --print-join-command
+      register: join_command
+      retries: 3
+      delay: 5
+      until: join_command.rc == 0
+
+    - name: Save join command to file
+      copy:
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/k8s-join-command.sh
+        mode: '0755'
+
+    - name: Fetch join command to local machine
+      fetch:
+        src: /tmp/k8s-join-command.sh
+        dest: /tmp/k8s-join-command.sh
+        flat: yes
+
+    - name: Verify join command was fetched
+      stat:
+        path: /tmp/k8s-join-command.sh
+      register: join_cmd_local
+      delegate_to: localhost
+      failed_when: not join_cmd_local.stat.exists
+
+- name: Join worker nodes to cluster
+  hosts: workers
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Check if node is already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: node_joined
+
+    - name: Check if containerd socket exists
+      stat:
+        path: /run/containerd/containerd.sock
+      register: containerd_socket
+
+    - name: Check if crio socket exists
+      stat:
+        path: /var/run/crio/crio.sock
+      register: crio_socket
+
+    - name: Determine CRI socket (prefer containerd)
+      set_fact:
+        cri_socket: "{{ '/run/containerd/containerd.sock' if containerd_socket.stat.exists else ('/var/run/crio/crio.sock' if crio_socket.stat.exists else '') }}"
+
+    - name: Display selected CRI socket
+      debug:
+        msg: "Using CRI socket: {{ cri_socket if cri_socket != '' else 'auto-detect' }}"
+
+    - name: Check if join command exists on controller
+      stat:
+        path: /tmp/k8s-join-command.sh
+      register: join_cmd_exists
+      delegate_to: localhost
+      when: not node_joined.stat.exists
+
+    - name: Fail if join command not found
+      fail:
+        msg: "Join command not found on Ansible controller. Master initialization may have failed."
+      when: not node_joined.stat.exists and not join_cmd_exists.stat.exists
+
+    - name: Copy join command from master
+      copy:
+        src: /tmp/k8s-join-command.sh
+        dest: /tmp/k8s-join-command.sh
+        mode: '0755'
+      when: not node_joined.stat.exists
+
+    - name: Add CRI socket to join command
+      shell: |
+        sed -i 's|kubeadm join|kubeadm join --cri-socket={{ cri_socket }}|' /tmp/k8s-join-command.sh
+      when: not node_joined.stat.exists and cri_socket != ''
+
+    - name: Join worker node to cluster
+      shell: bash /tmp/k8s-join-command.sh
+      when: not node_joined.stat.exists
+
+    - name: Remove join command file
+      file:
+        path: /tmp/k8s-join-command.sh
+        state: absent
+
+- name: Verify cluster status
+  hosts: master
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Wait for all nodes to be ready
+      shell: kubectl get nodes --no-headers | grep -v " Ready" | wc -l
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: nodes_not_ready
+      until: nodes_not_ready.stdout == "0"
+      retries: 30
+      delay: 10
+      ignore_errors: yes
+
+    - name: Display cluster nodes
+      shell: kubectl get nodes -o wide
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: cluster_nodes
+
+    - name: Show cluster information
+      debug:
+        msg: "{{ cluster_nodes.stdout_lines }}"
+
+    - name: Display cluster info
+      shell: kubectl cluster-info
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: cluster_info
+
+    - name: Show cluster information
+      debug:
+        msg: "{{ cluster_info.stdout_lines }}"
+
+    - name: Create kubeconfig for download
+      fetch:
+        src: /etc/kubernetes/admin.conf
+        dest: ./kubeconfig-{{ k8s_version }}
+        flat: yes
+
+- name: Install cert-manager (optional)
+  hosts: master
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Set install_certmanager if not provided
+      set_fact:
+        install_certmanager: "{{ install_certmanager | default('true') }}"
+
+    - name: Check if helm is installed
+      shell: which helm
+      register: helm_check
+      failed_when: false
+      changed_when: false
+      when: install_certmanager | bool
+
+    - name: Install helm if not present
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      when: install_certmanager | bool and helm_check.rc != 0
+
+    - name: Add jetstack helm repository
+      shell: |
+        helm repo add jetstack https://charts.jetstack.io --force-update
+        helm repo update
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: install_certmanager | bool
+
+    - name: Check if cert-manager is already installed
+      shell: helm list -n cert-manager | grep cert-manager
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: certmanager_check
+      failed_when: false
+      changed_when: false
+      when: install_certmanager | bool
+
+    - name: Install cert-manager
+      shell: |
+        helm install cert-manager jetstack/cert-manager \
+          --namespace cert-manager \
+          --create-namespace \
+          --version v1.15.1 \
+          --set crds.enabled=true
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: install_certmanager | bool and certmanager_check.rc != 0
+
+    - name: Wait for cert-manager to be ready
+      shell: kubectl wait --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager --timeout=300s
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      when: install_certmanager | bool
+      ignore_errors: yes
+
+    - name: Verify cert-manager installation
+      shell: kubectl get pods -n cert-manager
+      environment:
+        KUBECONFIG: /etc/kubernetes/admin.conf
+      register: certmanager_pods
+      when: install_certmanager | bool
+
+    - name: Display cert-manager status
+      debug:
+        msg: "{{ certmanager_pods.stdout_lines }}"
+      when: install_certmanager | bool

@@ -1,0 +1,199 @@
+---
+# Install and configure containerd
+
+- name: Create keyrings directory (Debian/Ubuntu)
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  when: ansible_os_family == "Debian"
+
+- name: Determine Docker repository URL
+  set_fact:
+    docker_repo_url: "{{ 'https://download.docker.com/linux/debian' if ansible_distribution == 'Debian' else 'https://download.docker.com/linux/ubuntu' }}"
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker's official GPG key (Debian/Ubuntu)
+  get_url:
+    url: "{{ docker_repo_url }}/gpg"
+    dest: /tmp/docker-gpg-key
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker GPG key to keyring (Debian/Ubuntu)
+  shell: |
+    cat /tmp/docker-gpg-key | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    chmod 644 /etc/apt/keyrings/docker.gpg
+  args:
+    creates: /etc/apt/keyrings/docker.gpg
+  when: ansible_os_family == "Debian"
+
+- name: Remove old Docker repository file if exists
+  file:
+    path: /etc/apt/sources.list.d/docker.list
+    state: absent
+  when: ansible_os_family == "Debian"
+
+- name: Add Docker repository (Debian/Ubuntu)
+  apt_repository:
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.gpg] {{ docker_repo_url }} {{ ansible_distribution_release }} stable"
+    state: present
+    filename: docker
+    update_cache: no
+  when: ansible_os_family == "Debian"
+
+- name: Update apt cache after adding Docker repo
+  apt:
+    update_cache: yes
+    cache_valid_time: 0
+  when: ansible_os_family == "Debian"
+  retries: 3
+  delay: 5
+  register: apt_update_result
+  until: apt_update_result is succeeded
+
+- name: Add Docker repository (RHEL/CentOS)
+  yum_repository:
+    name: docker-ce
+    description: Docker CE Repository
+    baseurl: https://download.docker.com/linux/centos/$releasever/$basearch/stable
+    enabled: yes
+    gpgcheck: yes
+    gpgkey: https://download.docker.com/linux/centos/gpg
+  when: ansible_os_family == "RedHat"
+
+- name: Remove conflicting containerd packages (Debian/Ubuntu)
+  apt:
+    name:
+      - containerd
+      - runc
+    state: absent
+    purge: yes
+  when: ansible_os_family == "Debian"
+  ignore_errors: yes
+
+- name: Get latest containerd version from repo (Debian/Ubuntu)
+  shell: apt-cache madison containerd.io | grep -E 'containerd.io.*2\.' | head -1 | awk '{print $3}'
+  register: containerd_version
+  when: ansible_os_family == "Debian"
+  changed_when: false
+
+- name: Install containerd v2.x (Debian/Ubuntu)
+  apt:
+    name: "containerd.io={{ containerd_version.stdout }}"
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian" and containerd_version.stdout != ""
+
+- name: Install containerd latest if v2.x not found (Debian/Ubuntu)
+  apt:
+    name: containerd.io
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian" and containerd_version.stdout == ""
+
+- name: Install containerd (RHEL/CentOS)
+  yum:
+    name: containerd.io
+    state: present
+  when: ansible_os_family == "RedHat"
+
+- name: Create containerd config directory
+  file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+
+- name: Clean up old certs.d directory
+  file:
+    path: /etc/containerd/certs.d
+    state: absent
+
+- name: Stop containerd before reconfiguration
+  systemd:
+    name: containerd
+    state: stopped
+  ignore_errors: yes
+
+- name: Remove old containerd configuration
+  file:
+    path: /etc/containerd/config.toml
+    state: absent
+
+- name: Generate default containerd configuration
+  shell: containerd config default > /etc/containerd/config.toml
+
+- name: Configure containerd to use systemd cgroup driver
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: Enable hosts.toml config in containerd (v2.x strict mode)
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: "config_path = ''"
+    replace: "config_path = '/etc/containerd/certs.d'"
+
+- name: Create containerd certs.d directory structure for insecure registry
+  file:
+    path: "/etc/containerd/certs.d/registry.test.pensando.io:5000"
+    state: directory
+    mode: '0755'
+
+- name: Create hosts.toml for insecure registry (strict mode)
+  copy:
+    dest: "/etc/containerd/certs.d/registry.test.pensando.io:5000/hosts.toml"
+    content: |
+      server = "http://registry.test.pensando.io:5000"
+
+      [host."http://registry.test.pensando.io:5000"]
+        capabilities = ["pull", "resolve"]
+
+      [host."registry.test.pensando.io:5000"]
+        capabilities = ["pull", "resolve"]
+    mode: '0644'
+
+- name: Enable and start containerd
+  systemd:
+    name: containerd
+    enabled: yes
+    state: restarted
+    daemon_reload: yes
+
+- name: Wait for containerd to be ready
+  wait_for:
+    path: /run/containerd/containerd.sock
+    state: present
+    timeout: 30
+
+- name: Verify containerd is running
+  systemd:
+    name: containerd
+  register: containerd_status
+
+- name: Check containerd service status
+  shell: systemctl is-active containerd
+  register: containerd_active
+  failed_when: containerd_active.stdout != "active"
+  changed_when: false
+
+- name: Verify containerd CRI plugin
+  shell: crictl --runtime-endpoint unix:///run/containerd/containerd.sock version
+  register: crictl_check
+  retries: 3
+  delay: 5
+  until: crictl_check.rc == 0
+  changed_when: false
+
+- name: Test insecure registry connectivity
+  shell: crictl --runtime-endpoint unix:///run/containerd/containerd.sock pull registry.test.pensando.io:5000/hello-world:latest || true
+  register: registry_test
+  changed_when: false
+  ignore_errors: yes
+
+- name: Display containerd and registry status
+  debug:
+    msg:
+      - "Containerd status: {{ containerd_active.stdout }}"
+      - "CRI plugin version: {{ crictl_check.stdout_lines[0] if crictl_check.rc == 0 else 'Failed' }}"
+      - "Registry test: {{ 'Success' if registry_test.rc == 0 else 'Failed (image may not exist)' }}"

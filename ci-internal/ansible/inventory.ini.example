@@ -1,0 +1,26 @@
+# Kubernetes Cluster Inventory Example
+# Copy this file to inventory.ini and update with your node information
+
+[master]
+k8s-master-01 ansible_host=192.168.1.10 ansible_user=root
+
+[workers]
+k8s-worker-01 ansible_host=192.168.1.11 ansible_user=root
+k8s-worker-02 ansible_host=192.168.1.12 ansible_user=root
+k8s-worker-03 ansible_host=192.168.1.13 ansible_user=root
+
+[all:vars]
+# SSH connection settings
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+# Kubernetes settings (can be overridden via -e flag)
+k8s_version=1.29.0
+pod_network_cidr=10.244.0.0/16
+service_cidr=10.96.0.0/12
+
+# Container runtime
+container_runtime=containerd
+
+# Network plugin (calico, flannel, cilium)
+network_plugin=calico
