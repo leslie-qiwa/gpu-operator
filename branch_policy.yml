@@ -4,5 +4,5 @@
 cherry_pick_branches:
   - collab-7.12
   - rocm/gpu-operator:main
-inherit_pr_description: True
-ai_conflict_resolution: True
+inherit-pr-description: True
+ai-conflict-resolution: True
