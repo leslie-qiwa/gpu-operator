@@ -432,11 +432,44 @@ while [[ $# -gt 0 ]]; do
     shift
 done
 
+function start_pod_monitor() {
+    echo ""
+    echo "========================================================================"
+    echo "Starting Pod Monitor"
+    echo "========================================================================"
+
+    # Configure pod monitor
+    export POD_MONITOR_NAMESPACES="${POD_MONITOR_NAMESPACES:-kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu}"
+    export POD_MONITOR_LOG="${POD_MONITOR_LOG:-/gpu-operator/tests/pytests/logs/sanity-pod-monitor-$(date +%Y%m%d_%H%M%S).log}"
+    export POD_MONITOR_FORMAT="${POD_MONITOR_FORMAT:-text}"
+    export POD_MONITOR_INTERVAL="${POD_MONITOR_INTERVAL:-5}"
+
+    # Ensure logs directory exists
+    mkdir -p /gpu-operator/tests/pytests/logs
+
+    # Start pod monitor
+    if /gpu-operator/ci-internal/pod_monitor.sh start; then
+        echo "Pod monitor started successfully"
+        # Ensure pod monitor stops on script exit
+        trap '/gpu-operator/ci-internal/pod_monitor.sh stop' EXIT INT TERM
+    else
+        echo "WARNING: Pod monitor failed to start - continuing without monitoring"
+        echo "Check that kr8s is installed and kubeconfig is accessible"
+    fi
+
+    echo "========================================================================"
+    echo ""
+}
+
 function main() {
     prepare_cluster
     setup_registry
     load_images
     echo "Completed setting up environment for launching pytest"
+
+    # Start pod monitoring before running tests
+    start_pod_monitor
+
     if [[ "${DEPLOYMENT}" == "k8" ]];
     then
         launch_pytest_k8
