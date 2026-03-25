@@ -70,7 +70,7 @@ def _init_cmdline_args():
     image_cmd.add_argument("--load-images", action='store_true', default=False, help = "Load images into the registry")
     image_cmd.add_argument("--setup-insecure-registry", action='store_true', default=False, help = "Load images into the registry")
     image_cmd.add_argument("--pull-images", action='store_true', default=False, help = "Download images on each nodes of the cluster")
-    image_cmd.add_argument("--registry", default=None, help = "Destination Registry")
+    image_cmd.add_argument("--registries", default=None, help = "Registry information as json file")
     image_cmd.add_argument("--image-manifest", default='/tmp/images.yaml', help = "generated images yaml")
     image_cmd.add_argument("--seed-image-manifest", default='/gpu-operator/ci-internal/sanity-images.yml', help = "generated images yaml")
     image_cmd.add_argument("--target", default='k8', choices=["k8", "openshift", "standalone"], help = "Target deployment")
@@ -91,6 +91,13 @@ def _load_testbed_json(testbed_json):
         if "Instances" in data:
             testbed_info = data["Instances"][0]["RawJSON"]
             return testbed_info
+    return None
+
+def _load_registries_info(registries_spec):
+    if registries_spec:
+        with open(registries_spec, "r") as fp:
+            data = json.load(fp)
+        return data
     return None
 
 def _is_pull_images_enabled(testbed_json):
@@ -365,12 +372,13 @@ def _reboot_workers(logger, master, workers):
             ret = False
     return ret
 
-def _load_images(logger, registry, seed_image_manifest, image_manifest, target):
+def _load_images(logger, registry_info, seed_image_manifest, image_manifest, target):
     import docker
 
-    if not registry:
+    if not registry_info:
         return False
 
+    image_registry_info  = registry_info["image-registry"]
     result = True
     # Load seed_image_manifest
     from ruamel.yaml import YAML
@@ -441,42 +449,48 @@ def _load_images(logger, registry, seed_image_manifest, image_manifest, target):
                 image_name, image_tag = image_ver.split(':')
                 logger.info(f"For artifact: {artifact_name}, image-tag: {loaded_image_tag}, derived image-name: {image_name} tag: {image_tag}")
 
-                # Push tag to specified registry
                 tag = loaded_image.attrs['Config']['Labels'].get('HOURLY_TAG', metadata.get("ReleaseTag", ""))
                 if "agfhc" in image_tag:
                     tag = f"agfhc-{tag}"
                 if tag == "":
                     tag = image_tag
 
-                loaded_image.tag(repository = f"{registry}/rocm/{image_name}", tag = tag)
-                new_image = f"{registry}/rocm/{image_name}"
+                if image_registry_info["type"] == "hosted":
+                    # Push tag to specified registry
+                    img_registry = image_registry_info["value"]
+                    loaded_image.tag(repository = f"{img_registry}/rocm/{image_name}", tag = tag)
+                    new_image = f"{img_registry}/rocm/{image_name}"
 
-                done = False
-                for _ in range(5):
-                    successful = True
-                    try:
-                        for line in client.images.push(f"{new_image}:{tag}", stream=True, decode=True):
-                            if 'errorDetail' in line:
-                                err_msg = line['errorDetail']['message']
-                                logger.error(f"Error while pushing image {new_image}:{tag}, error: {err_msg}")
-                                successful = False
-                                break
-                            #logger.debug(f"{new_image}:{tag} => {line}")
-                    except docker.errors.APIError as de:
-                        logger.error(f"Fatal Error: Unable to tag image {image_file}, error : {de}")
-                        result = False
-                        break
-                    except Exception as e:
-                        logger.error(f"Fatal Error: Unknown error while tagging image {image_file}, error : {e}")
-                        result = False
-                        break
-                    if successful:
-                        logger.info(f"Successfully pushed {new_image}:{tag}")
-                        done = True
-                        break
-                    else:
-                        logger.warning("Failed to push docker images, retry after 10sec")
-                        time.sleep(10)
+                    done = False
+                    for _ in range(5):
+                        successful = True
+                        try:
+                            for line in client.images.push(f"{new_image}:{tag}", stream=True, decode=True):
+                                if 'errorDetail' in line:
+                                    err_msg = line['errorDetail']['message']
+                                    logger.error(f"Error while pushing image {new_image}:{tag}, error: {err_msg}")
+                                    successful = False
+                                    break
+                                #logger.debug(f"{new_image}:{tag} => {line}")
+                        except docker.errors.APIError as de:
+                            logger.error(f"Fatal Error: Unable to tag image {image_file}, error : {de}")
+                            result = False
+                            break
+                        except Exception as e:
+                            logger.error(f"Fatal Error: Unknown error while tagging image {image_file}, error : {e}")
+                            result = False
+                            break
+                        if successful:
+                            logger.info(f"Successfully pushed {new_image}:{tag}")
+                            done = True
+                            break
+                        else:
+                            logger.warning("Failed to push docker images, retry after 10sec")
+                            time.sleep(10)
+                elif image_registry_info["type"] == "global": 
+                    # images are already available in amdpsdo or rocm, but we need image_name!!
+                    img_registry = image_registry_info["value"]
+                    new_image = f"{img_registry}/{image_name}"
 
                 if done:
                     artifact_info['location'] = f"container://{new_image}"
@@ -487,19 +501,30 @@ def _load_images(logger, registry, seed_image_manifest, image_manifest, target):
                     result = False
     if result:
         # Update driver section (only for k8 and standalone)
+        driver_registry_info = registry_info["driver-registry"]
+        drv_registry = driver_registry_info["value"]
         if target in ['k8', 'standalone']:
             artifact_name = 'driver'
             driver_info = image_manifest_templ['images'][target][artifact_name]
-            driver_info['location'] = f"container://{registry}/driver-builds"
+            driver_info['location'] = f"container://{drv_registry}/driver-builds"
             # driver_info['location'] = f"container://registry.test.pensando.io:5000/amdgpu_kmod"
         with open(image_manifest, 'w') as fp:
             yaml.dump(image_manifest_templ, fp)
     return result
 
-def _upload_docker_daemon_conf(logger, registry, testbed_info):
+def _upload_docker_daemon_conf(logger, registry_info, testbed_info):
     # Generate/Update /etc/docker/daemon.json file
     daemon_conf = DOCKER_DAEMON_CONFIG
-    daemon_conf["insecure-registries"].append(registry)
+    registries = []
+    image_registry_info  = registry_info["image-registry"]
+    driver_registry_info = registry_info["driver-registry"]
+    if image_registry_info["secure"] == "no":
+        registries.append(image_registry_info["value"])
+
+    if driver_registry_info["secure"] == "no":
+        registries.append(driver_registry_info["value"])
+
+    daemon_conf["insecure-registries"].extend(registries)
     with open("/tmp/docker_daemon.json", "w") as fp:
         json.dump(daemon_conf, fp, indent=4)
 
@@ -517,7 +542,7 @@ def _upload_docker_daemon_conf(logger, registry, testbed_info):
             return result.return_code
     return 0
 
-def _upload_crio_registry_conf(logger, registry, testbed_info):
+def _upload_crio_registry_conf(logger, registry_info, testbed_info):
     """
     Generates a CRI-O registry configuration file for an insecure registry.
 
@@ -538,15 +563,24 @@ def _upload_crio_registry_conf(logger, registry, testbed_info):
 
     # Create a new TOML document
     doc = tomlkit.document()
+    doc.add("registry", tomlkit.aot())  # Add Array of Tables
 
     # Create the [[registry]] table
-    registry_table = tomlkit.table()
-    registry_table.add("location", registry)
-    registry_table.add("insecure", True)
+    image_registry_info  = registry_info["image-registry"]
+    driver_registry_info = registry_info["driver-registry"]
+    if image_registry_info["secure"] == "no":
+        registry_table = tomlkit.table()
+        registry_table.add("location", image_registry_info["value"])
+        registry_table.add("insecure", True)
+        # Add the registry table to the document
+        doc["registry"].append(registry_table)
 
-    # Add the registry table to the document
-    doc.add("registry", tomlkit.aot())  # Add Array of Tables
-    doc["registry"].append(registry_table)
+    if driver_registry_info["secure"] == "no":
+        registry_table = tomlkit.table()
+        registry_table.add("location", driver_registry_info["value"])
+        registry_table.add("insecure", True)
+        # Add the registry table to the document
+        doc["registry"].append(registry_table)
 
     # Write the TOML content to the file
     try:
@@ -584,16 +618,16 @@ def _upload_crio_registry_conf(logger, registry, testbed_info):
         # Ignore error as image cleanup would fail as some images are still in use
     return 0
 
-def _upload_containerd_registry_conf(logger, registry, testbed_info):
+def _upload_containerd_registry_conf(logger, registry_info, testbed_info):
     """
     Updates containerd configuration to add insecure registry using hosts.toml (v2.x strict mode).
 
-    This function adds the dynamic test registry passed via --registry flag.
+    This function adds the dynamic test registries that are marked as insecure.
     It also ensures registry.test.pensando.io:5000 is configured (defensive check).
 
     Args:
         logger: Logger instance
-        registry (str): The hostname:port of the dynamic test registry
+        registry_info (dict): Registry information containing image-registry and driver-registry
         testbed_info: Testbed information containing node details
 
     Returns:
@@ -608,8 +642,20 @@ def _upload_containerd_registry_conf(logger, registry, testbed_info):
 
     # Build list of registries to ensure are configured
     registries_to_check = [permanent_registry]
-    if registry and registry != permanent_registry:
-        registries_to_check.append(registry)
+
+    # Add registries from registry_info if they are insecure
+    image_registry_info = registry_info["image-registry"]
+    driver_registry_info = registry_info["driver-registry"]
+
+    if image_registry_info["secure"] == "no":
+        img_registry = image_registry_info["value"]
+        if img_registry != permanent_registry:
+            registries_to_check.append(img_registry)
+
+    if driver_registry_info["secure"] == "no":
+        drv_registry = driver_registry_info["value"]
+        if drv_registry != permanent_registry and drv_registry not in registries_to_check:
+            registries_to_check.append(drv_registry)
 
     masters = _get_master_nodes(testbed_info)
     workers = _get_worker_nodes(testbed_info)
@@ -810,30 +856,34 @@ def _run_testbed_commands(logger):
 
 def _run_image_commands(logger):
     if GlobalOptions.load_images:
-        if _load_images(logger, GlobalOptions.registry, GlobalOptions.seed_image_manifest, 
+        registry_info = _load_registries_info(GlobalOptions.registries)
+        if _load_images(logger, registry_info, GlobalOptions.seed_image_manifest,
                         GlobalOptions.image_manifest, GlobalOptions.target):
             logger.info(f"Images loaded to specified registry, Successfully generated image-manifest - {GlobalOptions.image_manifest}")
         else:
-            logger.error(f"Failed to load images into the registry: {GlobalOptions.registry}")
+            logger.error(f"Failed to load images into the registry: {registry_info}")
             sys.exit(1)
     if GlobalOptions.setup_insecure_registry:
         testbed_info = _load_testbed_json(GlobalOptions.testbed)
+        registry_info = _load_registries_info(GlobalOptions.registries)
         if GlobalOptions.target in ["k8", "standalone"]:
-            if _upload_docker_daemon_conf(logger, GlobalOptions.registry, testbed_info) == 0:
+            if _upload_docker_daemon_conf(logger, registry_info, testbed_info) == 0:
                 logger.info("Successfully uploaded new /etc/docker/daemon.json to all nodes")
             else:
                 logger.warning(f"Failed to upload /etc/docker/daemon.json to all nodes - ignoring this error")
-            if _upload_crio_registry_conf(logger, GlobalOptions.registry, testbed_info) == 0:
+            if _upload_crio_registry_conf(logger, registry_info, testbed_info) == 0:
                 logger.info("Successfully uploaded new /etc/containers/registries.conf.d/runner-registry.conf to all nodes")
             else:
                 logger.warning(f"Failed to upload /etc/containers/registries.conf.d/runner-registry.conf to all nodes - ignoring")
-            if _upload_containerd_registry_conf(logger, GlobalOptions.registry, testbed_info) == 0:
+            if _upload_containerd_registry_conf(logger, registry_info, testbed_info) == 0:
                 logger.info("Successfully updated containerd registry configuration on all nodes")
             else:
                 logger.warning(f"Failed to update containerd registry configuration on all nodes - ignoring")
         elif GlobalOptions.target in ["openshift"]:
-            # Patch machine-config on openshift cluster to make regsitry insecure
+            # Patch machine-config on openshift cluster to make regsitry insecure (only if it is insecure)
 
+            # Driver-registry is not applicable to openshift
+            # Image-registry - update only if it is insecure
             # Remove older/stale insecure registry
             patch_json = {
                 "spec": {
@@ -851,23 +901,24 @@ def _run_image_commands(logger):
                 logger.error(f"Failed to run kubectl_patch_cmd : {kubectl_patch_cmd}, error: {result}")
                 sys.exit(1)
 
-            # Include new self-hosted registry
-            patch_json = {
-                "spec": {
-                    "registrySources": {
-                        "insecureRegistries": [
-                            GlobalOptions.registry,
-                            "registry.test.pensando.io:5000",
-                        ]
+            if registry_info["image-registry"]["secure"] == "no":
+                # Include new self-hosted registry
+                patch_json = {
+                    "spec": {
+                        "registrySources": {
+                            "insecureRegistries": [
+                                registry_info["image-registry"]["value"],
+                                "registry.test.pensando.io:5000",
+                            ]
+                        }
                     }
                 }
-            }
-            kubectl_patch_cmd = ["kubectl", "patch", "image.config.openshift.io/cluster", "--type=merge",
-                                 "--patch", json.dumps(patch_json)]
-            result = subprocess.run(kubectl_patch_cmd, stdout=subprocess.PIPE, stderr = subprocess.PIPE)
-            if result.returncode != 0:
-                logger.error(f"Failed to run kubectl_patch_cmd : {kubectl_patch_cmd}, error: {result}")
-                sys.exit(1)
+                kubectl_patch_cmd = ["kubectl", "patch", "image.config.openshift.io/cluster", "--type=merge",
+                                     "--patch", json.dumps(patch_json)]
+                result = subprocess.run(kubectl_patch_cmd, stdout=subprocess.PIPE, stderr = subprocess.PIPE)
+                if result.returncode != 0:
+                    logger.error(f"Failed to run kubectl_patch_cmd : {kubectl_patch_cmd}, error: {result}")
+                    sys.exit(1)
 
     if GlobalOptions.pull_images:
         if _is_pull_images_enabled(GlobalOptions.testbed):

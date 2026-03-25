@@ -353,6 +353,115 @@ device_config_template_v1_4_1 = {
     },
 }
 
+device_config_template_v1_5_0 = {
+    'apiVersion'    : 'amd.com/v1alpha1',
+    'kind'          : 'DeviceConfig',
+    'metadata'      : {
+        'name'      : 'test-deviceconfig',
+        'namespace' : 'default',
+    },
+    'spec'          : {
+        'commonConfig' : {
+        },
+        'driver'    : {
+            'enable': False,
+            'blacklist' : True,
+            'imageRegistryTLS' : {
+                'insecure'                  : True,
+                'insecureSkipTLSVerify'     : True,
+            },
+            'upgradePolicy' : {
+                'enable' : False,
+                'maxParallelUpgrades' : 1,
+                'maxUnavailableNodes' : '25%',
+                'nodeDrainPolicy' : {
+                    'force' : False,
+                    'timeoutSeconds' : 300,
+                },
+                'rebootRequired' : True,
+            },
+            'imageBuild' : {
+                'baseImageRegistry' : 'docker.io',
+            },
+        },
+        'devicePlugin' : {
+            'devicePluginImagePullPolicy' : 'Always',
+            'enableNodeLabeller' : False,
+            'nodeLabellerImagePullPolicy' : 'Always',
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+        },
+        'metricsExporter' : {
+            'imagePullPolicy'   : 'Always',
+            'enable'            : False,
+            'nodePort'          : 32500,
+            'port'              : 5000,
+            'serviceType'       : DQ('ClusterIP'),
+            'rbacConfig' : {
+                'enable'        : False,
+                'disableHttps'  : True,
+            },
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+            'podAnnotations' : {},
+            'serviceAnnotations' : {},
+            'prometheus' : {
+                'serviceMonitor' : {
+                    'enable': False,
+                    'honorLabels': False,
+                    'honorTimestamps': False,
+                    'interval': '30s',
+                    'attachMetadata' : {
+                        'node': False,
+                    },
+                    'relabelings': [
+                        {
+                            'sourceLabels': ['pod'],
+                            'targetLabel': 'exporter_pod',
+                            'action': 'replace',
+                            'regex': '(.*)',
+                            'replacement': '$1',
+                        },
+                        {
+                            'action': 'labeldrop',
+                            'regex': 'pod',
+                        },
+                    ],
+                },
+            },
+        },
+        'testRunner' : {
+            'enable' : False,
+            'config' : None,
+            'imagePullPolicy': 'Always',
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+        },
+        'configManager' : {
+            'enable' : False,
+            'imagePullPolicy' : 'IfNotPresent',
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+        },
+        'selector' : {
+            'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
+        },
+        'remediationWorkflow': { 
+            'autoStartWorkflow': True,
+            'enable': False,
+            'ttlForFailedWorkflows': '24h'
+        },
+    },
+}
+
 device_config_template_main = {
     'apiVersion'    : 'amd.com/v1alpha1',
     'kind'          : 'DeviceConfig',
@@ -471,6 +580,7 @@ device_config_templates = {
     'v1.3.0'    : device_config_template_v1_3_0,
     'v1.4.0'    : device_config_template_v1_3_0,
     'v1.4.1'    : device_config_template_v1_4_1,
+    'v1.5.0'    : device_config_template_v1_5_0,
     'v99.99.99' : device_config_template_main,
 }
 
@@ -623,6 +733,15 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
         if spec.get('commonConfig.initContainerImage.repository', None) and spec.get('commonConfig.initContainerImage.version', None):
             img = f"{spec['commonConfig.initContainerImage.repository']}:{spec['commonConfig.initContainerImage.version']}"
             device_config['spec']['commonConfig']['initContainerImage'] = img
+        if gpu_op_version >= version.Version('v1.5.0'):
+            if spec.get('commonConfig.utilsContainer.repository', None) and spec.get('commonConfig.utilsContainer.version', None):
+                img = f"{spec['commonConfig.utilsContainer.repository']}:{spec['commonConfig.utilsContainer.version']}"
+                utils_container_cfg = device_config['spec']['commonConfig'].setdefault('utilsContainer', {})
+                utils_container_cfg['image'] = img
+                if spec.get('commonConfig.utilsContainer.secret', None):
+                    utils_container_cfg['imageRegistrySecret'] = {
+                        'name' : spec.get('commonConfig.utilsContainer.secret')
+                    }
     else:
         del device_config['spec']['commonConfig']
 

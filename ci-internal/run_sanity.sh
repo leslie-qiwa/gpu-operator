@@ -10,7 +10,7 @@ function usage() {
     echo "          --k8-version <k8-version> Eg: 1.29.14 or 1.33.9, default 1.35.2"
     echo "          --app <app-name> Eg: gpu-operator, exporter, network-operator, debian, docker"
     echo "          --module <module-name>"
-    echo "          --registry <selection: local|master|global>"
+    echo "          --registry <selection: local|amdpsdo>"
     echo "          --testbed /path/to/testbed.json, default /warmd.json"
     echo "          --amdgpu-driver <selection: inbox|default-deviceconfig|{version} eg: 7.0.1>"
     echo "          --seed-image-manifest <path-to-seed-image-manifest>"
@@ -25,11 +25,10 @@ MODULE="ALL"
 AMDGPU_DRIVER="default-deviceconfig"
 GEN_IMAGE_MANIFEST="/tmp/images.yaml"
 SEED_IMAGE_MANIFEST="/gpu-operator/ci-internal/sanity-images.yml"
-GLOBAL_REGISTRY="registry.test.pensando.io:5000"
+GLOBAL_REGISTRY="docker.io/amdpsdo"
+TYPE="NA"
 APP_NAME="NA"
 K8_VERSION="1.35.2"
-
-REGISTRY=""
 
 function collect_logs() {
     echo "Collect test run logs"
@@ -98,59 +97,66 @@ function start_registry() {
 
 function setup_registry() {
     echo ""
+    echo "Setting up registry configuration"
+    jq -n '{}' > $PWD/registries.json
+
+    # Always start local registry - needed for driver builds even when using amdpsdo for images
+    start_registry
+
+    # Driver registry is always local (driver builds are pushed here)
+    DRIVER_REGISTRY="${HOST_IP}:${LOCAL_REGISTRY_PORT}"
+    SECURE="no"
+    TYPE="hosted"
+    jq --arg val "$DRIVER_REGISTRY" --arg sec "$SECURE" --arg reg_type "$TYPE" \
+        '.["driver-registry"] = {"value": $val, "secure": $sec, "type" : $reg_type}' \
+        $PWD/registries.json > /tmp/tmp.json && cp /tmp/tmp.json $PWD/registries.json
+
+    # Image registry can be local or global (amdpsdo)
     if [[ ${REGISTRY_SELECTION} == "local" ]];
     then
-        echo "Setting up local registry"
-        start_registry
-        REGISTRY="${HOST_IP}:${LOCAL_REGISTRY_PORT}"
-    elif [[ ${REGISTRY_SELECTION} == "master" ]];
+        IMG_REGISTRY="${HOST_IP}:${LOCAL_REGISTRY_PORT}"
+        SECURE="no"
+        TYPE="hosted"
+    elif [[ ${REGISTRY_SELECTION} == "amdpsdo" ]];
     then
-        echo "Extract master node details, setup registry : TODO"
-        exit 1
-    elif [[ ${REGISTRY_SELECTION} == "global" ]];
-    then
-        REGISTRY=${GLOBAL_REGISTRY}
+        IMG_REGISTRY=${GLOBAL_REGISTRY}
+        SECURE="yes"
+        TYPE="global"
     else
         echo "FATAL ERROR: Invalid registry-selection - ABORT"
         exit 1
     fi
+    jq --arg val "$IMG_REGISTRY" --arg sec "$SECURE" --arg reg_type "$TYPE" \
+        '.["image-registry"] = {"value": $val, "secure": $sec, "type" : $reg_type }' \
+        $PWD/registries.json > /tmp/tmp.json && cp /tmp/tmp.json $PWD/registries.json
+    echo ""
+    echo "Registry Information:"
+    jq . $PWD/registries.json
     echo ""
 }
 
 function load_images() {
     echo ""
-    echo "Run k8_jobd_ctl to "
-    echo "    (1) load images into registry : ${REGISTRY}"
-    echo "    (2) generate image-manifest-yaml for test"
+    echo "Run k8_jobd_ctl to:"
+    echo "    (1) Load/push images to registry (hosted mode) or reference global images (amdpsdo mode)"
+    echo "    (2) Configure insecure registries on cluster nodes"
+    echo "    (3) Generate image-manifest-yaml for test"
     echo ""
 
-    /gpu-operator/ci-internal/k8_jobd_ctl.py image --load-images --seed-image-manifest $SEED_IMAGE_MANIFEST --registry $REGISTRY --image-manifest $GEN_IMAGE_MANIFEST --testbed $TESTBED_JSON --setup-insecure-registry --target $DEPLOYMENT
+    /gpu-operator/ci-internal/k8_jobd_ctl.py image --load-images --seed-image-manifest $SEED_IMAGE_MANIFEST --registries $PWD/registries.json --image-manifest $GEN_IMAGE_MANIFEST --testbed $TESTBED_JSON --setup-insecure-registry --target $DEPLOYMENT
     RET=$?
     if [[ "$RET" != "0" ]]
     then
-        echo "FATAL ERROR: Failed load images and generate image-manfiest-yaml "
+        echo "FATAL ERROR: Failed to load images and configure cluster registries"
         exit $RET
     fi
     echo ""
 
     echo ""
-    echo "Run k8_jobd_ctl to "
-    echo "    (1) update insecure-registry for each node in the cluster"
+    echo "Run k8_jobd_ctl to:"
+    echo "    (1) Pull images on each worker node (optional pre-cache for faster pod startup)"
     echo ""
-    /gpu-operator/ci-internal/k8_jobd_ctl.py image --seed-image-manifest $SEED_IMAGE_MANIFEST --registry $REGISTRY --testbed $TESTBED_JSON --setup-insecure-registry --target $DEPLOYMENT
-    RET=$?
-    if [[ "$RET" != "0" ]]
-    then
-        echo "FATAL ERROR: Failed to setup insecure-registry at each node in the k8 cluster"
-        exit $RET
-    fi
-    echo ""
-
-    echo ""
-    echo "Run k8_jobd_ctl to "
-    echo "    (1) pull images for each worker node in the cluster"
-    echo ""
-    /gpu-operator/ci-internal/k8_jobd_ctl.py image --seed-image-manifest $SEED_IMAGE_MANIFEST --registry $REGISTRY --testbed $TESTBED_JSON --pull-images --target $DEPLOYMENT
+    /gpu-operator/ci-internal/k8_jobd_ctl.py image --seed-image-manifest $SEED_IMAGE_MANIFEST --registries $PWD/registries.json --testbed $TESTBED_JSON --pull-images --target $DEPLOYMENT
     RET=$?
     if [[ "$RET" != "0" ]]
     then

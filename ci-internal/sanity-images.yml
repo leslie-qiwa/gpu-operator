@@ -24,6 +24,11 @@ images:
             image       : file:///gpu-operator/gpu-operator.tar.gz
             kind        : container
 
+        gpu-operator-utils:
+            key         : commonConfig.utilsContainer.image
+            image       : file:///gpu-operator/gpu-operator-utils.tar.gz
+            kind        : container
+
         exporter:
             image       : file:///device-metrics-exporter/helm-charts/device-metrics-exporter-charts.tgz
             metadata    : file:///device-metrics-exporter/helm-charts/device-metrics-exporter-charts.metadata
@@ -189,6 +194,11 @@ images:
             kind        : olm-bundle
             version     : v1.5.0
             secret      : docker-amdpsdo-auth
+
+        gpu-operator-utils:
+            key         : commonConfig.utilsContainer.image
+            image       : file:///gpu-operator/gpu-operator-utils.tar.gz
+            kind        : container
 
         device-metrics-exporter:
             key         : metricsExporter.image
