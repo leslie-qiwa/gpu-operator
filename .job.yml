@@ -3,12 +3,12 @@ version: 2.0
 builds:
   build-gpu-operator:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && make && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-build && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-save && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-build-utils && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make docker-save-utils && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make bundle-build && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator make bundle-save"]
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make docker-build && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make docker-save && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make docker-build-utils && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make docker-save-utils && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make bundle-build && \
+               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator make bundle-save"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
      - /gpu-operator/gpu-operator.tar.gz
@@ -21,7 +21,7 @@ builds:
 
   build-gpu-operator-k8s:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && \
-               PROJECT_VERSION=v0.0.1 DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_CHART_VERSION=v0.0.1-${RELEASE:-dev} HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
+               PROJECT_VERSION=v0.0.1 IMAGE_TAG=${RELEASE:-latest} DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=amd-gpu-operator HELM_CHART_VERSION=v0.0.1-${RELEASE:-latest} HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
                mv helm-charts-k8s/gpu-operator-helm-k8s.tgz gpu-operator-helm-k8s.tgz"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
