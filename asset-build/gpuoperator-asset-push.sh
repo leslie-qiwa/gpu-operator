@@ -6,7 +6,7 @@ then
   exit 0
 fi
 
-echo "Copying gpu-operator artifacts and pushing docker image with tag: v$RELEASE"
+echo "Copying gpu-operator artifacts and pushing docker image with tag: $RELEASE"
 
 setup_dir () {
     ls -al /gpu-operator/
