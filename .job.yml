@@ -20,8 +20,8 @@ builds:
         reference: 3c4df0af409cecd65e006e63908611703fb03748
 
   build-gpu-operator-k8s:
-    commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && make && \
-               PROJECT_VERSION=v0.0.1 DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_CHARTS_VERSION=v0.0.1-${RELEASE:-dev} HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
+    commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && \
+               PROJECT_VERSION=v0.0.1 DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_CHART_VERSION=v0.0.1-${RELEASE:-dev} HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
                mv helm-charts-k8s/gpu-operator-helm-k8s.tgz gpu-operator-helm-k8s.tgz"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
