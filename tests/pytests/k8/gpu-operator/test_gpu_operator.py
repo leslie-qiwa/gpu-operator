@@ -62,8 +62,11 @@ def gpu_operator_install(gpu_cluster, gpu_operator_release_name, images, environ
     if images.get("gpu-operator.repo", None):
         helm_util.helm_add_repo(gpu_cluster, images.get("gpu-operator.repo-name"), images.get("gpu-operator.repo"))
 
+    secret_list = []
+    for entry in gpu_cluster.k8_secrets["secrets"]:
+        secret_list.append(entry["name"])
     values_yaml = os.path.join(environment.logdir, f"values_{environment.gpu_operator_version}.yaml")
-    if spec_util.generate_helmchart_deployment_config(environment.gpu_operator_version, images, values_yaml):
+    if spec_util.generate_helmchart_deployment_config(environment.gpu_operator_version, images, secret_list, values_yaml):
         Logger.debug(f"Generated values.yaml for helm-chart install command, {values_yaml}")
     else:
         values_yaml = None
@@ -247,8 +250,11 @@ def test_gpu_operator_uninstall(request, gpu_cluster, images, gpu_operator_relea
 
     def _restore_gpu_operator():
         # Restore gpu-operator
+        secret_list = []
+        for entry in gpu_cluster.k8_secrets["secrets"]:
+            secret_list.append(entry["name"])
         values_yaml = os.path.join(environment.logdir, f"values_{environment.gpu_operator_version}.yaml")
-        if spec_util.generate_helmchart_deployment_config(environment.gpu_operator_version, images, values_yaml):
+        if spec_util.generate_helmchart_deployment_config(environment.gpu_operator_version, images, secret_list, values_yaml):
             Logger.debug(f"Generated values.yaml for helm-chart install command, {values_yaml}")
         else:
             values_yaml = None

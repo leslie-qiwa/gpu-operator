@@ -213,9 +213,27 @@ function prepare_cluster() {
         fi
         sleep 30
 
-        # Step 4: Install K8s
-        echo "Installing Kubernetes ${K8_VERSION}..."
-        ansible-playbook -i inventory.ini install-k8s.yml -e "k8s_version=${K8_VERSION}"
+        # Step 4: Download secrets and extract Docker Hub credentials
+        echo "Downloading secrets.json for Docker Hub authentication..."
+        local SECRETS="/tmp/secrets.json"
+        curl -s http://pm.test.pensando.io/systest/gpu-operator-secrets/secrets.json -o ${SECRETS}
+
+        # Extract Docker Hub credentials from secrets.json
+        DOCKERHUB_USERNAME=$(jq -r '.secrets[] | select(.type=="docker-registry" and .server=="https://index.docker.io/v1/") | .username' ${SECRETS})
+        DOCKERHUB_PASSWORD=$(jq -r '.secrets[] | select(.type=="docker-registry" and .server=="https://index.docker.io/v1/") | .password' ${SECRETS})
+
+        # Step 5: Install K8s with Docker Hub credentials
+        echo "Installing Kubernetes ${K8_VERSION} with Docker Hub authentication..."
+        if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_PASSWORD" ]]; then
+            echo "Using Docker Hub credentials from secrets.json (username: ${DOCKERHUB_USERNAME})"
+            ansible-playbook -i inventory.ini install-k8s.yml \
+                -e "k8s_version=${K8_VERSION}" \
+                -e "dockerhub_username=${DOCKERHUB_USERNAME}" \
+                -e "dockerhub_password=${DOCKERHUB_PASSWORD}"
+        else
+            echo "WARNING: Docker Hub credentials not found in secrets.json - proceeding without authentication"
+            ansible-playbook -i inventory.ini install-k8s.yml -e "k8s_version=${K8_VERSION}"
+        fi
         RET=$?
         if [[ "$RET" != "0" ]]
         then
@@ -223,7 +241,7 @@ function prepare_cluster() {
             exit $RET
         fi
 
-        # Step 5: Install Docker with insecure registry config
+        # Step 6: Install Docker with insecure registry config
         echo "Installing Docker..."
         ansible-playbook -i inventory.ini install-docker.yml
         RET=$?
@@ -233,7 +251,7 @@ function prepare_cluster() {
             exit $RET
         fi
 
-        # Step 6: Install Prometheus (optional, non-fatal)
+        # Step 7: Install Prometheus (optional, non-fatal)
         echo "Installing Prometheus Operator..."
         ansible-playbook -i inventory.ini install-prometheus.yml
         RET=$?

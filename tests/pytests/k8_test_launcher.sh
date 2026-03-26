@@ -94,7 +94,13 @@ function launch_pytest() {
             test_sel="${DEPLOYMENT}/${APP_NAME}/ -k ${TC_MODULE}"
         fi
     fi
-    CMD_OPT="--verbose --show-capture=log --no-header -p no:warnings --disable-warnings --self-contained-html --css scripts/style.css"
+    # pytest options:
+    # --verbose: Show detailed test output
+    # --show-capture=log: Capture and display log output in reports
+    # --self-contained-html: Embed all assets (CSS/JS) in HTML report for portability
+    # -p no:warnings: Disable warnings plugin (suppresses pytest warnings)
+    # --disable-warnings: Suppress all warnings in output
+    CMD_OPT="--verbose --show-capture=log -p no:warnings --disable-warnings --self-contained-html"
     if [[ "${ENABLE_DEBUGGING}" == "YES" ]];
     then
         CMD_OPT+=" --pdb"

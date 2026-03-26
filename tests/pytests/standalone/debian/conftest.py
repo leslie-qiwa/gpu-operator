@@ -16,6 +16,14 @@
  limitations under the License.
 '''
 
+"""
+Pytest configuration for AMD Exporter Debian Package test suite.
+
+This module configures pytest for the standalone Debian package validation tests.
+It customizes the HTML report title to clearly identify test results for the
+AMD Device Metrics Exporter Debian package deployment and validation.
+"""
+
 import pdb
 import pytest
 import os
@@ -27,5 +35,14 @@ from lib import helm_util
 Logger = logging.getLogger("standalone.debian.conftest")
 
 def pytest_html_report_title(report):
-    # Add a custom title to the report
+    """
+    Customize the HTML test report title.
+
+    This hook is called by pytest-html to set the title of the generated
+    HTML test report. It identifies the report as AMD Exporter Debian
+    Package validation results.
+
+    Args:
+        report: The pytest-html report object to customize
+    """
     report.title = f"AMD Exporter Debian Package Validation Test Results"

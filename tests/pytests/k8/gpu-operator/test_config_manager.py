@@ -201,6 +201,11 @@ def create_dcm_configmap(gpu_cluster, environment):
     if os.path.exists(file_path):
         ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(namespace, configmap)
         k8_util.k8_create_configmap(namespace, configmap, file_path)
+    else:
+        # Lets create empty configmap to keep DCM happy!!
+        file_path = os.path.join("lib", "files", "partitioning_no_profiles.json")
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(namespace, configmap)
+        k8_util.k8_create_configmap(namespace, configmap, file_path)
     yield configmap
     ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(namespace, configmap)
 

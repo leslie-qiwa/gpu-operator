@@ -491,3 +491,421 @@ def pytest_html_results_table_row(report, cells):
     cells.insert(2, html.td(description))
     msg = getattr(report, 'error_summary', "-")
     cells.insert(3, html.td(msg))
+
+def pytest_html_report_title(report):
+    """
+    Set a custom title for the HTML report based on test suite.
+    """
+    report.title = "AMD GPU Operator Test Report"
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_setup(item):
+    """Add custom CSS to beautify HTML reports."""
+    yield
+
+def pytest_configure(config):
+    """
+    Add custom CSS styling to the HTML report for better aesthetics.
+    """
+    # Add custom CSS to the HTML report
+    css_content = """
+    <style>
+        /* ==================== Color Scheme ==================== */
+        :root {
+            --amd-red: #ed1c24;
+            --amd-dark: #2d2d2d;
+            --primary-gradient: linear-gradient(135deg, #ed1c24 0%, #c8102e 100%);
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --info-color: #17a2b8;
+            --light-bg: #f8f9fa;
+            --white: #ffffff;
+            --border-color: #dee2e6;
+            --text-dark: #212529;
+            --text-muted: #6c757d;
+        }
+
+        /* ==================== Global Styles ==================== */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to bottom, #f5f7fa 0%, #e9ecef 100%);
+            color: var(--text-dark);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        /* ==================== Header Styling ==================== */
+        h1 {
+            background: var(--primary-gradient) !important;
+            color: var(--white) !important;
+            padding: 40px 30px !important;
+            margin: 0 0 30px 0 !important;
+            border-radius: 12px !important;
+            box-shadow: 0 8px 16px rgba(237, 28, 36, 0.3) !important;
+            font-size: 32px !important;
+            font-weight: 700 !important;
+            text-align: center !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        h2 {
+            color: var(--amd-red) !important;
+            border-bottom: 3px solid var(--amd-red) !important;
+            padding-bottom: 12px !important;
+            margin: 30px 0 20px 0 !important;
+            font-weight: 600 !important;
+            font-size: 24px !important;
+        }
+
+        h3 {
+            color: var(--text-dark) !important;
+            font-weight: 600 !important;
+            margin: 20px 0 15px 0 !important;
+            font-size: 18px !important;
+        }
+
+        /* ==================== Summary Section ==================== */
+        #environment, .metadata {
+            background: var(--white);
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            margin: 20px 0;
+            border-left: 5px solid var(--amd-red);
+        }
+
+        .summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .summary > span {
+            background: var(--white);
+            padding: 20px 30px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            font-size: 16px;
+            font-weight: 600;
+            min-width: 180px;
+            text-align: center;
+            transition: transform 0.2s ease;
+        }
+
+        .summary > span:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        /* ==================== Results Table ==================== */
+        #results-table {
+            background: var(--white);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            margin: 30px 0;
+            border: none !important;
+        }
+
+        #results-table-head {
+            background: var(--primary-gradient) !important;
+        }
+
+        #results-table th {
+            color: var(--white) !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            font-size: 13px !important;
+            letter-spacing: 1px !important;
+            padding: 18px 15px !important;
+            border: none !important;
+            text-align: left !important;
+        }
+
+        #results-table td {
+            padding: 15px !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            font-size: 14px !important;
+            vertical-align: middle !important;
+        }
+
+        #results-table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        #results-table tbody tr:hover {
+            background-color: #f8f9fa !important;
+            transform: scale(1.01);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        #results-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        /* ==================== Test Status Styling ==================== */
+        .passed, tr.passed td {
+            background: linear-gradient(90deg, #d4edda 0%, #e8f5e9 100%) !important;
+            color: #155724 !important;
+            font-weight: 700 !important;
+            border-left: 5px solid var(--success-color) !important;
+        }
+
+        .failed, tr.failed td {
+            background: linear-gradient(90deg, #f8d7da 0%, #ffebee 100%) !important;
+            color: #721c24 !important;
+            font-weight: 700 !important;
+            border-left: 5px solid var(--danger-color) !important;
+        }
+
+        .skipped, tr.skipped td {
+            background: linear-gradient(90deg, #fff3cd 0%, #fffbf0 100%) !important;
+            color: #856404 !important;
+            font-weight: 700 !important;
+            border-left: 5px solid var(--warning-color) !important;
+        }
+
+        .error, tr.error td {
+            background: linear-gradient(90deg, #f5c6cb 0%, #ffcccc 100%) !important;
+            color: #721c24 !important;
+            font-weight: 700 !important;
+            border-left: 5px solid var(--danger-color) !important;
+        }
+
+        .xfailed, tr.xfailed td,
+        .xpassed, tr.xpassed td {
+            background: linear-gradient(90deg, #d1ecf1 0%, #e0f7fa 100%) !important;
+            color: #0c5460 !important;
+            font-weight: 700 !important;
+            border-left: 5px solid var(--info-color) !important;
+        }
+
+        /* ==================== Result Column Badges ==================== */
+        .col-result {
+            text-align: center !important;
+            font-weight: 800 !important;
+            padding: 10px 15px !important;
+            border-radius: 6px !important;
+            text-transform: uppercase !important;
+            font-size: 12px !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        /* ==================== Other Columns ==================== */
+        .col-name {
+            font-weight: 600 !important;
+            color: var(--text-dark) !important;
+        }
+
+        .col-duration {
+            font-family: 'Courier New', Consolas, monospace !important;
+            color: var(--text-muted) !important;
+            font-weight: 500 !important;
+        }
+
+        .col-links a {
+            color: var(--amd-red) !important;
+            text-decoration: none !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+            padding: 4px 8px !important;
+            border-radius: 4px !important;
+        }
+
+        .col-links a:hover {
+            background-color: var(--amd-red) !important;
+            color: var(--white) !important;
+            text-decoration: none !important;
+        }
+
+        /* ==================== Description & Failure Message ==================== */
+        .col-description {
+            font-style: italic;
+            color: var(--text-muted);
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        .col-description::first-line {
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        /* ==================== Collapsible Sections ==================== */
+        .collapsible {
+            background-color: var(--white);
+            border-radius: 8px;
+            margin: 15px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+            overflow: hidden;
+        }
+
+        /* ==================== Log Sections ==================== */
+        .log {
+            background: #1e1e1e !important;
+            color: #d4d4d4 !important;
+            padding: 20px !important;
+            border-radius: 8px !important;
+            font-family: 'Courier New', Consolas, monospace !important;
+            font-size: 13px !important;
+            line-height: 1.6 !important;
+            overflow-x: auto !important;
+            margin: 15px 0 !important;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+        }
+
+        .log::-webkit-scrollbar {
+            height: 10px;
+        }
+
+        .log::-webkit-scrollbar-track {
+            background: #2d2d2d;
+            border-radius: 5px;
+        }
+
+        .log::-webkit-scrollbar-thumb {
+            background: var(--amd-red);
+            border-radius: 5px;
+        }
+
+        /* ==================== Custom Tables (Cluster Info, Images) ==================== */
+        table[style*="border: 1px solid black"] {
+            background: var(--white) !important;
+            border-radius: 8px !important;
+            overflow: hidden !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+            border: none !important;
+            margin: 20px 0 !important;
+        }
+
+        table[style*="border: 1px solid black"] th {
+            background: var(--primary-gradient) !important;
+            color: var(--white) !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            padding: 15px !important;
+            border: none !important;
+            letter-spacing: 0.5px !important;
+        }
+
+        table[style*="border: 1px solid black"] td {
+            padding: 12px 15px !important;
+            border: none !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        table[style*="border: 1px solid black"] tr:last-child td {
+            border-bottom: none !important;
+        }
+
+        table[style*="border: 1px solid black"] tr:hover {
+            background-color: #f8f9fa !important;
+        }
+
+        /* ==================== AMD Branding Elements ==================== */
+        h1::before {
+            content: "🚀 ";
+            font-size: 28px;
+            margin-right: 10px;
+        }
+
+        /* ==================== Responsive Design ==================== */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 24px !important;
+                padding: 25px 20px !important;
+            }
+
+            #results-table {
+                font-size: 12px !important;
+            }
+
+            #results-table th,
+            #results-table td {
+                padding: 10px 8px !important;
+            }
+
+            .summary {
+                flex-direction: column;
+            }
+
+            .summary > span {
+                width: 100%;
+            }
+        }
+
+        /* ==================== Print Styles ==================== */
+        @media print {
+            body {
+                background: white;
+            }
+
+            #results-table tbody tr:hover {
+                transform: none;
+                box-shadow: none;
+            }
+
+            .col-links {
+                display: none;
+            }
+        }
+
+        /* ==================== Additional Enhancements ==================== */
+        .sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .sortable:hover {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
+        /* Success/Failure Count Styling */
+        span.passed {
+            color: var(--success-color) !important;
+            font-weight: 800 !important;
+        }
+
+        span.failed {
+            color: var(--danger-color) !important;
+            font-weight: 800 !important;
+        }
+
+        span.skipped {
+            color: var(--warning-color) !important;
+            font-weight: 800 !important;
+        }
+
+        /* Timestamp styling */
+        #environment p {
+            margin: 8px 0;
+            line-height: 1.8;
+        }
+
+        /* AMD Logo-inspired accent */
+        h1::after {
+            content: "";
+            display: block;
+            height: 4px;
+            background: var(--white);
+            margin-top: 15px;
+            border-radius: 2px;
+            width: 100px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+    """
+
+    config._html_css_content = css_content
+
+    # This will be injected into the HTML report
+    if hasattr(config, '_html'):
+        config._html.append(css_content)

@@ -90,7 +90,8 @@ def handle_image_manifest(values_yaml, args):
         # Add other location types if needed
 
     # Generate values.yaml
-    ok = spec_util.generate_helmchart_deployment_config(getattr(args, 'gpu_operator_version', 'latest'), images, values_yaml)
+    # Note: script doesn't have access to k8 secrets, passing empty list
+    ok = spec_util.generate_helmchart_deployment_config(getattr(args, 'gpu_operator_version', 'latest'), images, [], values_yaml)
     if not ok:
         print(f"Failed to generate values.yaml from manifest {args.image_manifest}")
         sys.exit(1)

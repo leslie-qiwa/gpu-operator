@@ -936,13 +936,20 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
 
     return device_config
 
-def generate_helmchart_deployment_config(gpu_operator_version, images, file_name):
+def generate_helmchart_deployment_config(gpu_operator_version, images, secret_list, file_name):
     '''
     Generate values.yaml used to install gpu-operator helm-chart
     '''
 
     modifed = False
     helmchart_values = copy.deepcopy(gpu_operator_helm_deployment_template_0)
+
+    if secret_list:
+        helmchart_values['global'] = {
+                'imagePullSecrets' : [],
+        }
+        for secret in secret_list:
+            helmchart_values['global']['imagePullSecrets'].append({'name' : secret})
 
     # kmm controller manager image-sign
     kmm_sign_prefix = 'kmm.controller.manager.env.relatedImageSign'

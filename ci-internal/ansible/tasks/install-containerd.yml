@@ -184,16 +184,18 @@
   delay: 5
   until: crictl_check.rc == 0
   changed_when: false
+  ignore_errors: yes
 
 - name: Test insecure registry connectivity
   shell: crictl --runtime-endpoint unix:///run/containerd/containerd.sock pull registry.test.pensando.io:5000/hello-world:latest || true
   register: registry_test
   changed_when: false
   ignore_errors: yes
+  when: crictl_check.rc == 0
 
 - name: Display containerd and registry status
   debug:
     msg:
       - "Containerd status: {{ containerd_active.stdout }}"
-      - "CRI plugin version: {{ crictl_check.stdout_lines[0] if crictl_check.rc == 0 else 'Failed' }}"
-      - "Registry test: {{ 'Success' if registry_test.rc == 0 else 'Failed (image may not exist)' }}"
+      - "CRI plugin version: {{ crictl_check.stdout_lines[0] if (crictl_check is defined and crictl_check.rc is defined and crictl_check.rc == 0) else 'Not verified (crictl will be installed with K8s packages)' }}"
+      - "Registry test: {{ 'Success' if (registry_test is defined and registry_test.rc is defined and registry_test.rc == 0) else 'Skipped (crictl not available yet)' }}"

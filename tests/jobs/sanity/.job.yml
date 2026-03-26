@@ -49,7 +49,7 @@ e2e-targets:
         "-c",
         "cat /warmd.json && cd /gpu-operator/tests/pytests && \
          /gpu-operator/ci-internal/run_sanity.sh --deployment openshift --app gpu-operator \
-         --registry local --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+         --registry local --testbed /warmd.json --amdgpu-driver 30.30"
     ]
     owners: ["email:srivatsa.sangli@amd.com"]
     tcp-ports: [5000]
