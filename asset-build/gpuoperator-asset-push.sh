@@ -36,10 +36,10 @@ docker_push () {
     docker login --username=shreyajmeraamd --password-stdin <<< "${DOCKERHUB_TOKEN}"
     # push operator controller image
     docker load -i /gpu-operator/gpu-operator.tar.gz
-    docker push docker.io/amdpsdo/gpu-operator:v$RELEASE
+    docker push docker.io/amdpsdo/gpu-operator:$RELEASE
     # push utils image
     docker load -i /gpu-operator/gpu-operator-utils.tar.gz
-    docker push docker.io/amdpsdo/gpu-operator-utils:v$RELEASE
+    docker push docker.io/amdpsdo/gpu-operator-utils:$RELEASE
     # push OLM bundle image
     docker load -i /gpu-operator/gpu-operator-olm-bundle.tar.gz
     docker push docker.io/amdpsdo/gpu-operator-bundle:$RELEASE

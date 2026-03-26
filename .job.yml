@@ -21,7 +21,7 @@ builds:
 
   build-gpu-operator-k8s:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && make && \
-               DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
+               PROJECT_VERSION=v0.0.1 DOCKER_REGISTRY=docker.io/amdpsdo IMAGE_NAME=gpu-operator HELM_CHARTS_VERSION=v0.0.1-${RELEASE:-dev} HELM_OUTPUT_FILE_NAME=gpu-operator-helm-k8s.tgz make helm && \
                mv helm-charts-k8s/gpu-operator-helm-k8s.tgz gpu-operator-helm-k8s.tgz"]
     owners: ["email:mharkara@amd.com"]
     artifacts:
@@ -236,18 +236,18 @@ targets:
     commands: ["sh", "-cx",
       "cd ci-internal && ./setup_e2e.sh;
       cd ../ &&
-      SIM_ENABLE=1 make all &&
-      SIM_ENABLE=1 make docker-push &&
+      SIM_ENABLE=1 DOCKER_REGISTRY=registry.test.pensando.io:5000 IMAGE_NAME=amd-gpu-operator KMM_IMAGE_TAG=latest make all &&
+      SIM_ENABLE=1 DOCKER_REGISTRY=registry.test.pensando.io:5000 IMAGE_NAME=amd-gpu-operator KMM_IMAGE_TAG=latest make docker-push &&
       helm repo add jetstack https://charts.jetstack.io --force-update &&
       helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.15.1 --set crds.enabled=true &&
-      SIM_ENABLE=1 SKIP_INSTALL_DEFAULT_CR=1 make helm-install &&
+      SIM_ENABLE=1 SKIP_INSTALL_DEFAULT_CR=1 DOCKER_REGISTRY=registry.test.pensando.io:5000 IMAGE_NAME=amd-gpu-operator make helm-install &&
       sleep 60 && kubectl get pods -A | grep amd &&
       cd ci-internal && ./create_secret.sh && cd ../ &&
       sleep 60 && kubectl get pods -A | grep amd &&
       ci-internal/run_e2e.sh || E2E_FAILED=1;
       kubectl get pods -A | grep amd &&
-      SIM_ENABLE=1 SKIP_INSTALL_DEFAULT_CR=1 make helm-uninstall &&
-      make helm-e2e || HELM_E2E_FAILED=1;
+      SIM_ENABLE=1 SKIP_INSTALL_DEFAULT_CR=1 DOCKER_REGISTRY=registry.test.pensando.io:5000 IMAGE_NAME=amd-gpu-operator make helm-uninstall &&
+      DOCKER_REGISTRY=registry.test.pensando.io:5000 IMAGE_NAME=amd-gpu-operator make helm-e2e || HELM_E2E_FAILED=1;
       [ -z \"$E2E_FAILED\" ] && [ -z \"$HELM_E2E_FAILED\" ]"]
     owners: ["email:sajmera@amd.com"]
     queue_name: ubuntu2204
