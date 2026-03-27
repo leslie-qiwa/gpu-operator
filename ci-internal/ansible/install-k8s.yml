@@ -564,7 +564,8 @@
           --namespace cert-manager \
           --create-namespace \
           --version v1.15.1 \
-          --set crds.enabled=true
+          --set crds.enabled=true \
+          --set startupapicheck.enabled=false
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
       when:
@@ -579,7 +580,8 @@
           --create-namespace \
           --version v1.15.1 \
           --set crds.enabled=true \
-          --set global.imagePullSecrets[0].name=dockerhub-secret
+          --set global.imagePullSecrets[0].name=dockerhub-secret \
+          --set startupapicheck.enabled=false
       environment:
         KUBECONFIG: /etc/kubernetes/admin.conf
       when:

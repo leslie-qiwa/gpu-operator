@@ -393,7 +393,7 @@ def _load_images(logger, registry_info, seed_image_manifest, image_manifest, tar
         if target != tgt and tgt in image_manifest_templ['images']:
             del image_manifest_templ['images'][tgt]
 
-    client = docker.from_env(timeout=300)
+    client = docker.from_env(timeout=900)
     for artifact_name in list(image_manifest_templ['images'][target].keys()):
         logger.info(f"Processing {artifact_name} section")
         artifact_info = image_manifest_templ['images'][target][artifact_name]

@@ -31,6 +31,7 @@ from collections import defaultdict
 from typing import List, Dict
 from kubernetes import client, config, stream, watch
 from kubernetes.client.rest import ApiException
+from urllib3.exceptions import ProtocolError, IncompleteRead
 import lib.common as common
 
 Logger = logging.getLogger("lib.k8util")
@@ -682,7 +683,7 @@ def k8_create_namespace(namespace : str):
     msg_body = client.V1Namespace(metadata=client.V1ObjectMeta(name=namespace))
     try:
         api_response = api.create_namespace(body = msg_body)
-        Logger.debug("k8_create_namespace::api_response : {api_response}")
+        Logger.debug(f"k8_create_namespace::api_response : {api_response}")
         return 0, "", ""
     except ApiException as e:
         if e.status == 409 and e.reason == 'Conflict':
@@ -1231,19 +1232,22 @@ def k8_create_configmap(namespace : str, configmap_name : str, configmap_json_fi
     - If the input file has .crt extension, store raw file content under file name.
     """
     global Logger 
-    if os.path.splitext(configmap_json_file)[1] == '.json' : 
-        with open(configmap_json_file) as fp:
-            data = json.load(fp)
-        data = {"config.json" : json.dumps(data)}
-    elif os.path.splitext(configmap_json_file)[1] == '.crt' : 
-        with open(configmap_json_file, "r", encoding="utf-8") as fp:
-            raw_text = fp.read()
-        data = {os.path.basename(configmap_json_file) : raw_text}
+    if configmap_json_file:
+        if os.path.splitext(configmap_json_file)[1] == '.json' : 
+            with open(configmap_json_file) as fp:
+                data = json.load(fp)
+            data = {"config.json" : json.dumps(data)}
+        elif os.path.splitext(configmap_json_file)[1] == '.crt' : 
+            with open(configmap_json_file, "r", encoding="utf-8") as fp:
+                raw_text = fp.read()
+            data = {os.path.basename(configmap_json_file) : raw_text}
+        else:
+            Logger.error(
+                f"Unsupported file type for '{configmap_json_file}'. "
+                "Expected a file with .json or .crt extension.")
+            return -1, "", f"Unsupported file type: {configmap_json_file}"
     else:
-        Logger.error(
-            f"Unsupported file type for '{configmap_json_file}'. "
-            "Expected a file with .json or .crt extension.")
-        return -1, "", f"Unsupported file type: {configmap_json_file}"
+        data = {}
     api = client.CoreV1Api()
     config_map = client.V1ConfigMap(
             api_version = "v1",
@@ -1528,10 +1532,58 @@ def k8_patch_deployment(deployment, namespace, new_toleration, tolerate_add):
     try:
         api.patch_namespaced_deployment(name=name, namespace=namespace, body=body)
     except ApiException as e:
-        print(f"Could not patch Deployment {name}: {e}")
+        Logger.error(f"Could not patch Deployment {name}: {e}")
 
 @log_arguments
-def k8_patch_daemonset(daemonset, namespace, new_toleration, tolerate_add):
+def k8_patch_config_map(config_map_name, namespace, body):
+    """
+    API to modify config-map
+    """
+    api = client.CoreV1Api()
+    Logger.info(f"-> Patching ConfigMap: {config_map_name}")
+    try:
+        api.patch_namespaced_config_map(name=config_map_name, namespace=namespace, body=body)
+    except ApiException as e:
+        Logger.error(f"Could not patch ConfigMap {config_map_name}: {e}")
+        return -1, "", str(e)
+    return 0, "", ""
+
+@log_arguments
+def k8_patch_daemonset(daemonset_name, namespace, body):
+    """
+    API to modify daemonset
+    """
+    api = client.AppsV1Api()
+    Logger.info(f"Patching DaemonSet: {daemonset_name}")
+    try:
+        api.patch_namespaced_daemon_set(name=daemonset_name, namespace=namespace, body=body)
+    except ApiException as e:
+        Logger.error(f"Could not patch DaemonSet {daemonset_name}: {e}")
+        if e.status == 404:
+            try:
+                api.create_namespaced_daemon_set(namespace=namespace, body=body)
+                return 0, "", ""
+            except ApiException as ae:
+                Logger.error(f"Could not create Daemonset {daemonset_name}: {ae}")
+        return -1, "", str(e)
+    return 0, "", ""
+
+@log_arguments
+def k8_delete_daemonset(namespace : str, daemonset_name : str):
+    """
+    API to delete daemonset
+    """
+    api = client.AppsV1Api()
+    Logger.info(f"Deleting DaemonSet: {daemonset_name}")
+    try:
+        api.delete_namespaced_daemon_set(name=daemonset_name, namespace=namespace)
+    except ApiException as e:
+        Logger.error(f"Could not delete DaemonSet {daemonset_name}: {e}")
+        return -1, "", str(e)
+    return 0, "", ""
+
+@log_arguments
+def k8_daemonset_modify_tolerations(daemonset, namespace, new_toleration, tolerate_add):
     """Adds a toleration to a single DaemonSet."""
     api = client.AppsV1Api()
     name = daemonset.metadata.name
@@ -1546,7 +1598,7 @@ def k8_patch_daemonset(daemonset, namespace, new_toleration, tolerate_add):
     try:
         api.patch_namespaced_daemon_set(name=name, namespace=namespace, body=body)
     except ApiException as e:
-        print(f"Could not patch DaemonSet {name}: {e}")
+        Logger.error(f"Could not patch DaemonSet {name}: {e}")
 
 @log_arguments
 def k8_patch_statefulset(statefulset, namespace, new_toleration, tolerate_add):
@@ -1565,7 +1617,7 @@ def k8_patch_statefulset(statefulset, namespace, new_toleration, tolerate_add):
     try:
         api.patch_namespaced_stateful_set(name=name, namespace=namespace, body=body)
     except ApiException as e:
-        print(f"Could not patch StatefulSet {name}: {e}")
+        Logger.error(f"Could not patch StatefulSet {name}: {e}")
 
 @log_arguments
 def k8_patch_tolerations(namespace, toleration, tolerate_add=True):
@@ -1584,19 +1636,19 @@ def k8_patch_tolerations(namespace, toleration, tolerate_add=True):
     )
 
     # --- Patch Deployments ---
-    #print(f"Patching Deployments in namespace: {namespace}")
+    #Logger.debug(f"Patching Deployments in namespace: {namespace}")
     deployments = client_v1.list_namespaced_deployment(namespace=namespace)
     for deployment in deployments.items:
         k8_patch_deployment(deployment, namespace, new_toleration, tolerate_add)
 
     # --- Patch DaemonSets ---
-    #print(f"Patching DaemonSets in namespace: {namespace}")
+    #Logger.debug(f"Patching DaemonSets in namespace: {namespace}")
     daemonsets = client_v1.list_namespaced_daemon_set(namespace=namespace)
     for daemonset in daemonsets.items:
-        k8_patch_daemonset(daemonset, namespace, new_toleration, tolerate_add)
+        k8_daemonset_modify_tolerations(daemonset, namespace, new_toleration, tolerate_add)
 
     # --- Patch StatefulSets ---
-    #print(f"Patching StatefulSets in namespace: {namespace}")
+    #Logger.debug(f"Patching StatefulSets in namespace: {namespace}")
     statefulsets = client_v1.list_namespaced_stateful_set(namespace=namespace)
     for statefulset in statefulsets.items:
         k8_patch_statefulset(statefulset, namespace, new_toleration, tolerate_add)
@@ -1748,7 +1800,7 @@ def k8_delete_cluster_role_binding(cluster_role_name):
     return 0, "", ""
 
 @log_arguments
-def k8_create_service_account(sa_name : str, namespace : str) -> None:
+def k8_create_service_account(sa_name : str, namespace : str) -> (int, str, str):
     """
     API to create service-account
 
@@ -1928,7 +1980,7 @@ def k8_create_auth_file(secret_name : str, namespace : str) -> bool:
     try:
         v1 = client.CoreV1Api()
         # 2. Fetch the secret
-        print(f"Fetching secret {secret_name} from namespace {namespace}...")
+        Logger.debug(f"Fetching secret {secret_name} from namespace {namespace}...")
         secret = v1.read_namespaced_secret(name=secret_name, namespace=namespace)
 
         # 3. Extract the '.dockerconfigjson' key
@@ -2378,12 +2430,35 @@ def k8_list_subscriptions() -> (int, List, str):
     group = "operators.coreos.com"
     version = "v1alpha1"
     plural = "subscriptions"
-    try:
-        subscriptions = custom_objects_api.list_cluster_custom_object(group=group, version=version, plural=plural)
-        return 0, subscriptions.get("items", []), ""
-    except ApiException as e:
-        Logger.error(f"Failed to list CR, error: {e}")
-        return -1, [], str(e)
+
+    # Retry logic for IncompleteRead errors
+    max_retries = 5
+    retry_delay = 2  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            subscriptions = custom_objects_api.list_cluster_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                _request_timeout=60
+            )
+            return 0, subscriptions.get("items", []), ""
+        except (ProtocolError, IncompleteRead) as e:
+            if attempt < max_retries - 1:
+                Logger.warning(f"IncompleteRead error on attempt {attempt + 1}/{max_retries}, retrying in {retry_delay}s... Error: {e}")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                Logger.error(f"Failed to list subscriptions after {max_retries} attempts due to IncompleteRead: {e}")
+                return -1, [], str(e)
+        except ApiException as e:
+            Logger.error(f"Failed to list CR, error: {e}")
+            return -1, [], str(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error listing subscriptions: {e}")
+            return -1, [], str(e)
     return 0, [], ""
 
 @log_arguments
@@ -2397,12 +2472,35 @@ def k8_list_catalogsources() -> (int, List, str):
     group = "operators.coreos.com"
     version = "v1alpha1"
     plural = "catalogsources"
-    try:
-        catalogsources = custom_objects_api.list_cluster_custom_object(group=group, version=version, plural=plural)
-        return 0, catalogsources.get("items", []), ""
-    except ApiException as e:
-        Logger.error(f"Failed to list CR, error: {e}")
-        return -1, [], str(e)
+
+    # Retry logic for IncompleteRead errors
+    max_retries = 5
+    retry_delay = 2  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            catalogsources = custom_objects_api.list_cluster_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                _request_timeout=60
+            )
+            return 0, catalogsources.get("items", []), ""
+        except (ProtocolError, IncompleteRead) as e:
+            if attempt < max_retries - 1:
+                Logger.warning(f"IncompleteRead error on attempt {attempt + 1}/{max_retries}, retrying in {retry_delay}s... Error: {e}")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                Logger.error(f"Failed to list catalogsources after {max_retries} attempts due to IncompleteRead: {e}")
+                return -1, [], str(e)
+        except ApiException as e:
+            Logger.error(f"Failed to list CR, error: {e}")
+            return -1, [], str(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error listing catalogsources: {e}")
+            return -1, [], str(e)
     return 0, [], ""
 
 @log_arguments
@@ -2416,12 +2514,37 @@ def k8_list_clusterserviceversions() -> (int, List, str):
     group = "operators.coreos.com"
     version = "v1alpha1"
     plural = "clusterserviceversions"
-    try:
-        catalogsources = custom_objects_api.list_cluster_custom_object(group=group, version=version, plural=plural)
-        return 0, catalogsources.get("items", []), ""
-    except ApiException as e:
-        Logger.error(f"Failed to list CR, error: {e}")
-        return -1, [], str(e)
+
+    # Retry logic for IncompleteRead errors
+    max_retries = 5
+    retry_delay = 2  # seconds
+
+    for attempt in range(max_retries):
+        try:
+            # Increase timeout for large responses
+            custom_objects_api.api_client.rest_client.pool_manager.connection_pool_kw['timeout'] = 60
+            catalogsources = custom_objects_api.list_cluster_custom_object(
+                group=group,
+                version=version,
+                plural=plural,
+                _request_timeout=60  # 60 second timeout
+            )
+            return 0, catalogsources.get("items", []), ""
+        except (ProtocolError, IncompleteRead) as e:
+            if attempt < max_retries - 1:
+                Logger.warning(f"IncompleteRead error on attempt {attempt + 1}/{max_retries}, retrying in {retry_delay}s... Error: {e}")
+                time.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+                continue
+            else:
+                Logger.error(f"Failed to list clusterserviceversions after {max_retries} attempts due to IncompleteRead: {e}")
+                return -1, [], str(e)
+        except ApiException as e:
+            Logger.error(f"Failed to list CR, error: {e}")
+            return -1, [], str(e)
+        except Exception as e:
+            Logger.error(f"Unexpected error listing clusterserviceversions: {e}")
+            return -1, [], str(e)
     return 0, [], ""
 
 @log_arguments

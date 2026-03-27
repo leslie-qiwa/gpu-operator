@@ -16,6 +16,52 @@
  limitations under the License.
 '''
 
+"""
+AMD GPU Operator Node Labeller Test Suite.
+
+This test suite validates the Kubernetes node labeller functionality within the
+AMD GPU Operator. The node labeller is a daemonset component that automatically
+discovers AMD GPU properties and applies informative labels to Kubernetes nodes.
+
+Node Labeller Functionality:
+- Runs as a daemonset pod on each GPU node
+- Queries GPU hardware properties using ROCm SMI or similar tools
+- Applies standardized labels to node metadata
+- Supports dynamic enable/disable via DeviceConfig CR
+- Labels persist until explicitly removed by the labeller
+
+Expected GA Labels (amd.com namespace):
+- amd.com/gpu.device-id: GPU device PCI ID (e.g., 740f)
+- amd.com/gpu.family: GPU architecture family (e.g., AI, CDNA)
+- amd.com/gpu.simd-count: Total SIMD compute units across all GPUs
+- amd.com/gpu.vram: Total video memory across all GPUs
+
+Deployment Model:
+- Enabled via DeviceConfig CR: devicePlugin.enableNodeLabeller: true
+- Creates node-labeller daemonset pods (1 per GPU node)
+- Labels applied immediately upon pod startup
+- Labels removed when labeller is disabled
+
+Test Coverage:
+1. Verify node-labeller pod deployment when enabled
+2. Validate presence and correctness of GA labels
+3. Test dynamic disable/enable of labeller
+4. Verify label cleanup when labeller disabled
+5. Verify label restoration when labeller re-enabled
+6. Validate label values against hardware properties
+
+Test Environment:
+- Requires GPU cluster with Kubernetes
+- GPU Operator helm chart must be installed
+- AMDGPU driver must be installed on nodes
+- ROCm stack available for GPU property queries
+
+Key Dependencies:
+- lib.k8_util: Kubernetes cluster and node operations
+- lib.spec_util: DeviceConfig CR generation utilities
+- lib.util.K8Helper: Test assertion and triage utilities
+"""
+
 import pytest
 import pprint
 import pdb
@@ -49,6 +95,66 @@ EXPECTED_BETA_LABELS = {
 
 @pytest.fixture(scope="module")
 def deviceconfig_install(gpu_cluster, images, gpu_operator_install, environment):
+    """
+    Deploy DeviceConfig CR with node labeller enabled for testing.
+
+    This fixture handles the complete lifecycle of DeviceConfig custom resources
+    configured specifically for node labeller testing. It creates one or more
+    DeviceConfig CRs depending on cluster GPU heterogeneity.
+
+    Setup Phase:
+    1. Cleanup any existing DeviceConfig CRs from previous tests
+    2. Query cluster for GPU nodes
+    3. Build DeviceConfig CR configuration with:
+       - driver.enable: True (AMDGPU driver deployment)
+       - devicePlugin.enableNodeLabeller: True (enable labeller daemonset)
+       - metricsExporter.enable: False (not needed for this test)
+       - testRunner.enable: False (not needed for this test)
+    4. Generate DeviceConfig CR templates based on GPU node selector requirements
+       - Single DeviceConfig if all nodes have identical GPUs
+       - Multiple DeviceConfigs if cluster has heterogeneous GPUs
+    5. Assign unique NodePorts for metrics exporter (if multiple configs)
+    6. Create DeviceConfig CRs via kubectl apply
+    7. Wait for DeviceConfig status to become Ready
+    8. Wait for KMM worker completion (driver module compilation/loading)
+    9. Update cluster node driver version information
+
+    DeviceConfig CR Structure:
+        apiVersion: amd.com/v1alpha1
+        kind: DeviceConfig
+        metadata:
+          name: node-labeller-test-config
+          namespace: {gpu_operator_namespace}
+        spec:
+          selector:
+            feature.node.kubernetes.io/pci-1002.present: "true"
+          driver:
+            enable: true
+          devicePlugin:
+            enableNodeLabeller: true
+          metricsExporter:
+            enable: false
+
+    Teardown Phase (after all tests complete):
+    1. Query all DeviceConfig CRs in gpu-operator namespace
+    2. Delete each DeviceConfig CR
+    3. Kubernetes garbage collection removes associated daemonsets and pods
+
+    Args:
+        gpu_cluster: GPU cluster fixture providing node information
+        images: Dictionary containing image repository and version information
+        gpu_operator_install: Fixture ensuring GPU Operator helm chart is installed
+        environment: Test environment fixture for logging and triaging
+
+    Yields:
+        DeviceConfigCRInfo: Object containing:
+            - test_cfg_map: Dict mapping DeviceConfig name to configuration
+            - exporter_port_map: Dict mapping node hostname to NodePort number
+            - devicecfg_list: List of DeviceConfig CR names created
+
+    Raises:
+        AssertionError: If GPU nodes not found, DeviceConfig creation fails, or pods don't become ready
+    """
     global Logger
 
     # cleanup - remove any deviceconfigs and then gpu-operator helm-chart
@@ -113,6 +219,66 @@ def deviceconfig_install(gpu_cluster, images, gpu_operator_install, environment)
     return
 
 def test_node_labeller_enable_flag(deviceconfig_install, environment):
+    """
+    Verify node labeller can be dynamically enabled, disabled, and re-enabled.
+
+    This test validates the complete lifecycle of node labeller management via
+    DeviceConfig CR modifications. It ensures that:
+    - Labels are applied when labeller is enabled
+    - Labels are removed when labeller is disabled
+    - Labels are re-applied when labeller is re-enabled
+
+    Test Flow:
+    1. Initial State - Verify labeller enabled (from fixture):
+       - Query GPU nodes from cluster
+       - Verify device-plugin and node-labeller pods are Running
+       - Check all GPU nodes have expected GA labels applied
+       - Verify labels contain valid values
+
+    2. Disable Node Labeller:
+       - Modify DeviceConfig CR: devicePlugin.enableNodeLabeller = false
+       - Apply updated DeviceConfig CR via kubectl
+       - Wait for node-labeller pods to terminate
+       - Verify all amd.com/* labels removed from all GPU nodes
+
+    3. Re-enable Node Labeller:
+       - Modify DeviceConfig CR: devicePlugin.enableNodeLabeller = true
+       - Apply updated DeviceConfig CR via kubectl
+       - Wait for node-labeller pods to return to Running state
+       - Verify labels are re-applied (tested implicitly by pod readiness)
+
+    Expected Pod States:
+        Enabled state:
+            test-deviceconfig-device-plugin-8f7px      1/1     Running
+            test-deviceconfig-node-labeller-54vpd      1/1     Running
+
+        Disabled state:
+            test-deviceconfig-device-plugin-8f7px      1/1     Running
+            (node-labeller pods terminated/removed)
+
+    Label Verification:
+        When enabled, each node should have:
+        - amd.com/gpu.device-id: <device-id>
+        - amd.com/gpu.family: AI (or other family)
+        - amd.com/gpu.simd-count: <count>
+        - amd.com/gpu.vram: <vram>
+
+        When disabled, all amd.com/* labels should be absent.
+
+    Success Criteria:
+        - Node labeller pods deploy/terminate correctly based on flag
+        - Labels appear when labeller enabled
+        - Labels removed when labeller disabled
+        - Labels re-appear when labeller re-enabled
+        - No residual labels remain after disable
+
+    Args:
+        deviceconfig_install: DeviceConfig deployment fixture with labeller enabled
+        environment: Test environment for triaging and logging
+
+    Raises:
+        AssertionError: If pods fail to deploy/terminate, or labels not applied/removed correctly
+    """
     global Logger
 
     ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
@@ -200,6 +366,70 @@ def test_node_labeller_enable_flag(deviceconfig_install, environment):
     K8Helper.triage(environment, not failed_pods, f"One or more pods are not ready - {failed_pods}")
 
 def test_node_labeller_check_labels(deviceconfig_install, environment):
+    """
+    Verify node labeller applies correct GPU property labels to all nodes.
+
+    This test validates that the node labeller correctly discovers GPU hardware
+    properties and applies accurate labels with valid values to each GPU node.
+
+    Test Flow:
+    1. Ensure node labeller is enabled in DeviceConfig CR
+    2. Verify device-plugin and node-labeller pods are Running
+    3. Query GPU nodes from cluster
+    4. For each GPU node, validate label presence and values:
+       - amd.com/gpu.family: Must equal "AI" (CDNA architecture)
+       - amd.com/gpu.device-id: Must be present and non-empty
+       - amd.com/gpu.vram: Must be present and non-empty
+       - amd.com/gpu.simd-count: Must be present and > 0
+
+    Label Validation Details:
+        amd.com/gpu.family:
+            - Expected value: "AI" (for CDNA/Instinct GPUs)
+            - Other possible values: CDNA, RDNA, GCN (architecture-dependent)
+
+        amd.com/gpu.device-id:
+            - Format: 4-digit hex PCI device ID (e.g., "740f")
+            - Unique identifier for GPU model
+
+        amd.com/gpu.vram:
+            - Format: Memory size string (e.g., "64G", "32G")
+            - Total VRAM across all GPUs on the node
+
+        amd.com/gpu.simd-count:
+            - Format: Integer string (e.g., "104", "208")
+            - Total SIMD compute units across all GPUs
+            - Must be greater than 0
+
+    Commented/Future Tests:
+        Beta labels (beta.amd.com namespace):
+            - Currently disabled in code
+            - Legacy label format from earlier GPU operator versions
+            - May be re-enabled for backward compatibility testing
+
+        Device ID count labels:
+            - Format: amd.com/gpu.device-id.<device-id>: "<count>"
+            - Example: amd.com/gpu.device-id.740f: "2"
+            - Currently disabled, may be added in future versions
+
+        VRAM count labels:
+            - Format: amd.com/gpu.vram.<size>: "<count>"
+            - Example: amd.com/gpu.vram.64G: "2"
+            - Currently disabled, may be added in future versions
+
+    Success Criteria:
+        - All expected GA labels present on every GPU node
+        - All label values are non-empty
+        - gpu.family equals "AI"
+        - gpu.simd-count is positive integer
+        - No missing or malformed labels
+
+    Args:
+        deviceconfig_install: DeviceConfig deployment fixture
+        environment: Test environment for triaging and logging
+
+    Raises:
+        AssertionError: If any expected label is missing, empty, or has incorrect value
+    """
     global Logger
 
     ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()

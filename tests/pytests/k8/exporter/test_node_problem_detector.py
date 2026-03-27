@@ -1,0 +1,223 @@
+#!/usr/bin/python3
+
+'''
+ Copyright (c) Advanced Micro Devices, Inc. All rights reserved.
+
+ Licensed under the Apache License, Version 2.0 (the \"License\");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an \"AS IS\" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+'''
+
+import pdb
+import pytest
+import pprint
+import sys
+import os
+import time
+import json
+import logging
+import random
+import functools
+from collections import defaultdict
+import lib.common as common
+import lib.helm_util as helm_util
+import lib.k8_util as k8_util
+import lib.spec_util as spec_util
+import lib.npd_util as npd_util
+from lib.util import K8Helper
+
+#pytestmark = pytest.mark.skip("debugging")
+Logger = logging.getLogger("k8.test_node_problem_detector")
+LogPrettyPrinter = pprint.PrettyPrinter(indent = 2)
+
+@pytest.fixture(scope="module")
+def amdgpu_driver_install(gpu_cluster, images, gpu_operator_install, environment):
+    global Logger
+
+    # cleanup - remove any deviceconfigs and then gpu-operator helm-chart
+    devcfg_map = k8_util.k8_get_deviceconfigs_info(environment.gpu_operator_namespace)
+    for devcfg_name, _ in devcfg_map.items():
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_deviceconfig_cr(environment.gpu_operator_namespace, devcfg_name)
+        if ret_code != 0:
+            Logger.error(f"Failed to delete deviceconfig name: {devcfg_name}, error : {ret_stderr}")
+    time.sleep(10)
+
+    if environment.amdgpu_driver_spec["driver-deployment"] == "inbox":
+        Logger.info(f"Using inbox driver - no need to install device-config")
+        yield
+        return
+
+    # Setup deviceconfig CR to install amdgpu driver
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    K8Helper.triage(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
+    K8Helper.triage(environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster")
+
+    test_config = {
+            'metadata.namespace' : environment.gpu_operator_namespace,
+            'driver.enable' : True,
+            'devicePlugin.enableNodeLabeller' : False,
+            'metricsExporter.enable' : False,
+        }
+    test_config.update(images)
+
+    test_cfg_map = spec_util.build_deviceconfig_cr_template(test_config, gpu_nodes, 'exporter', environment.amdgpu_driver_spec)
+    devicecfg_list = []
+    for spec_name, tcfg in test_cfg_map.items():
+        cr_spec = spec_util.generate_k8_deviceconfig_cr(environment.gpu_operator_version, tcfg)
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_create_deviceconfig_cr(cr_spec)
+        K8Helper.triage(environment, (ret_code == 0), f"Failed to create deviceconfig, stderr: {ret_stderr}")
+        devicecfg_list.append(tcfg['metadata.name'])
+
+    # Check for corresponding deviceconfig created
+    K8Helper.check_deviceconfig_status(environment, devicecfg_list)
+    for devcfg in devicecfg_list:
+        K8Helper.wait_kmm_worker_completion(environment, devcfg)
+    K8Helper.update_node_driver_version(gpu_cluster, environment)
+
+    yield
+
+    device_cfg_info = k8_util.k8_get_deviceconfigs_info(environment.gpu_operator_namespace, None)
+    for devcfg_name, _ in device_cfg_info.items():
+        k8_util.k8_delete_deviceconfig_cr(environment.gpu_operator_namespace, devcfg_name)
+    return
+
+@pytest.fixture(scope="module")
+def deploy_exporter_helmchart(request, gpu_cluster, amdgpu_driver_install, images, environment):
+    global Logger
+
+    # Install exporter helm-chart
+    if images.get("exporter.repo", None):
+        helm_util.helm_add_repo(gpu_cluster, images.get("exporter.repo-name"), images.get("exporter.repo"))
+
+    exporter_release_name = "device-metrics-exporter"
+    def _uninstall_exporter_helmchart():
+        ret_code, ret_stdout, ret_stderr = helm_util.helm_uninstall(gpu_cluster, exporter_release_name, environment.exporter_namespace)
+        if ret_code != 0:
+            helm_util.helm_cleanup(gpu_cluster, exporter_release_name, environment.exporter_namespace)
+    request.addfinalizer(_uninstall_exporter_helmchart)
+    _uninstall_exporter_helmchart()
+
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    K8Helper.triage(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
+    K8Helper.triage(environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster")
+
+    # Check if amdgpuhealth utility is not mounted on each node - /var/lib/amd-metrics-exporter
+    for node in gpu_nodes:
+        node_name = k8_util.k8_get_node_hostname(node)
+        cmd = ["ls", "-1", "/var/lib/amd-metrics-exporter/amdgpuhealth"]
+        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        K8Helper.triage(environment, ret_code != 0, f"Utility /var/lib/amd-metrics-exporter/amdgpuhealth found on {node_name} before installation")
+
+    options = {
+        "service.type" : "ClusterIP",
+        "nodeSelector" : {
+            "feature.node.kubernetes.io/amd-gpu": "true",
+        },
+    }
+    values_yaml = os.path.join(environment.logdir, f"exporter_values_{environment.context.current_tc_name}.yaml")
+    if spec_util.generate_exporter_helmchart_deployment_config(environment.exporter_version, images, values_yaml, **options):
+        Logger.debug(f"Generated values.yaml for helm-chart install command, {values_yaml}")
+    else:
+        values_yaml = None
+
+    ret_code, ret_stdout, ret_stderr = helm_util.helm_install(gpu_cluster, exporter_release_name,
+                                                              environment.exporter_namespace,
+                                                              images.get('exporter.helm-chart', None),
+                                                              environment.exporter_version, values_yaml)
+    if ret_code != 0:
+        Logger.error(f"Failed to install helm chart for {exporter_release_name}")
+        Logger.error(f"Stdout: {ret_stdout.strip()}")
+        Logger.error(f"Stderr: {ret_stderr.strip()}")
+    K8Helper.triage(environment, (ret_code == 0), f"Failed to install helm-chart for {exporter_release_name}")
+
+    K8Helper.triage(environment,
+                    helm_util.is_helm_chart_healthy(gpu_cluster, exporter_release_name, environment.exporter_namespace),
+                    "exporter helm-chart is in failed state")
+    K8Helper.watch_for_daemon_rollout(environment, environment.exporter_namespace, len(gpu_cluster.cluster_nodes))
+
+    time.sleep(20) # Wait for exporter pods to start working
+    exporter_pods = []
+    for node in gpu_cluster.cluster_nodes:
+        if node.is_gpu_node():
+            pod_name = k8_util.k8_get_pod_name("amdgpu-metrics-exporter", environment.exporter_namespace, node.host_name)
+            exporter_pods.append(common.PodInfo(pod_name, 1, 1))
+    failed_pods = k8_util.k8_check_pod_running(environment.exporter_namespace, exporter_pods)
+    K8Helper.triage(environment, not failed_pods, f"One or more pods are not ready - {failed_pods}")
+
+    # Get endpoint for each node
+    ret_code, endpoint_values = k8_util.k8_get_endpoints(environment.exporter_namespace)
+    K8Helper.triage(environment, (ret_code == 0), f"Error while collecting kubectl endpoints")
+    failed_endpoints = set()
+    service_name = f"device-metrics-exporter-amd-metrics-exporter-svc"
+    K8Helper.triage(environment, (service_name in endpoint_values), f"No endpoint address found for {service_name}")
+    K8Helper.triage(environment, (len(endpoint_values[service_name]) > 0),
+                    f"No endpoint address found for {service_name}")
+    for host_ip_port in endpoint_values[service_name]:
+        host, ip, port = host_ip_port
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_run_curl_cmd(gpu_cluster, ["-s", f"http://{ip}:{port}/metrics"])
+        if ret_code != 0:
+            failed_endpoints.add(host_ip_port)
+            Logger.error(f"Failed to get metrics from nodeport endpoint for {host_ip_port}, stdout: {ret_stdout} stderr: {ret_stderr}")
+
+    K8Helper.triage(environment, (len(failed_endpoints) == 0), f"One or more metric endpoints HTTP-GET failed, nodes: {failed_endpoints}")
+    yield
+    _uninstall_exporter_helmchart()
+    return
+
+def test_exporter_amdgpuhealth_hostpath(gpu_cluster, deploy_exporter_helmchart, environment):
+    global Logger
+
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    K8Helper.triage(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
+    K8Helper.triage(environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster")
+
+    # Check if amdgpuhealth utility is mounted on each node - /var/lib/amd-metrics-exporter
+    for node in gpu_nodes:
+        node_name = k8_util.k8_get_node_hostname(node)
+        cmd = ["/var/lib/amd-metrics-exporter/amdgpuhealth"]
+        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        K8Helper.triage(environment, ret_code == 0, f"Unable to run /var/lib/amd-metrics-exporter/amdgpuhealth on {node_name}")
+        K8Helper.triage(environment, resp_stdout != None, f"Error: Command output is None")
+        Logger.debug(f"Cmd:{cmd}, Response:\n{resp_stdout}")
+
+@pytest.mark.parametrize("metric_to_test, threshold", [
+    ("amd_gpu_violation_gfx_clock_below_host_limit_power_percentage", 100)
+])
+def test_exporter_amdgpuhealth_counter(request, gpu_cluster, deploy_exporter_helmchart, deploy_npd_daemonset, metric_to_test, threshold, environment):
+    global Logger
+
+    def _cleanup_npd_config():
+        npd_util.remove_npd_amdgpuhealth_plugin()
+
+    request.addfinalizer(_cleanup_npd_config)
+
+    _cleanup_npd_config()
+
+    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin("counter", metric_to_test, threshold)
+    K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
+    # TODO: Check for daemon-set rollout, node-condition
+
+@pytest.mark.parametrize("metric_to_test, threshold", [
+    ("amd_gpu_ecc_correct_athub", 1)
+])
+def test_exporter_amdgpuhealth_gauge(request, gpu_cluster, deploy_exporter_helmchart, deploy_npd_daemonset, metric_to_test, threshold, environment):
+    global Logger
+
+    def _cleanup_npd_config():
+        npd_util.remove_npd_amdgpuhealth_plugin()
+
+    request.addfinalizer(_cleanup_npd_config)
+
+    _cleanup_npd_config()
+    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin("gauge", metric_to_test, threshold)
+    K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
+    # TODO: Check for daemon-set rollout, node-condition
+

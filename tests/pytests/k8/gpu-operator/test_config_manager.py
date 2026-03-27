@@ -1029,7 +1029,7 @@ def test_partitioning_workload_MI325X(gpu_cluster, deviceconfig_install, environ
     run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = True)
 
 
-@pytest.mark.level23
+@pytest.mark.skip(reason="TODO: Review testcase based on gpu-count in given testbed")
 @pytest.mark.parametrize("profile", ["CPX_NPS1"])
 def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
@@ -1059,7 +1059,7 @@ def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, env
 
     exporter_nodeport_exp_config(request, gpu_cluster, deviceconfig_install, environment)
 
-@pytest.mark.level23
+@pytest.mark.skip(reason="TODO: Review testcase based on gpu-count in given testbed")
 @pytest.mark.parametrize("profile", ["CPX_NPS1"])
 def test_partitioning_63_workloads_MI350P(gpu_cluster, deviceconfig_install, environment, request,
                                           create_dcm_configmap, profile):

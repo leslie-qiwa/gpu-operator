@@ -99,25 +99,39 @@ def pytest_addoption(parser):
     )
 
 def pytest_html_results_summary(prefix, summary, postfix):
-    # Insert custom HTML into the summary section of the report
-    '''
-    prefix.extend([html.h3("Testbed Information")])
-    summary.extend([html.h3("Additional Summary Information")])
-    postfix.extend([html.h3("Post Run Information")])
-    '''
+    """
+    Add custom information to the summary section of the report.
+
+    Adds Environment info (AMDGPU Driver, Cluster Nodes) and Images table
+    to the prefix section (appears right after default Environment section).
+    """
+    # Add AMDGPU Driver info
     if hasattr(pytest, "_amdgpu_driver_spec"):
         ver = pytest._amdgpu_driver_spec.get('default-version', 'NA')
         deployment_mode = pytest._amdgpu_driver_spec.get('driver-deployment', 'NA')
-        summary.append(html.h3(f"AMDGPU Driver Version : {ver}/{deployment_mode}"))
-        summary.append(html.br())
+        prefix.extend([
+            html.h3("AMDGPU Driver Version"),
+            html.p(
+                html.strong(f"Version: {ver} | Deployment: {deployment_mode}"),
+                style="font-size: 16px; color: #212529; margin: 10px 0;"
+            ),
+        ])
+
+    # Add Cluster Information
     if hasattr(pytest, "_k8_cluster_inst") and hasattr(pytest, "_nodes_version"):
-        summary.append(html.h3("Cluster Information"))
-        summary.append(cluster_info_table())
-        summary.append(html.br())
+        prefix.extend([
+            html.h3("Cluster Nodes"),
+            cluster_info_table(),
+            html.br()
+        ])
+
+    # Add Images table
     if hasattr(pytest, "_image_info"):
-        summary.append(html.h3("Images Used"))
-        summary.append(transform_image_info())
-        summary.append(html.br())
+        prefix.extend([
+            html.h3("Images Used"),
+            transform_image_info(),
+            html.br()
+        ])
     
 def cluster_info_table():
     gpu_series_by_host = {
@@ -178,6 +192,13 @@ def transform_image_info():
 
 @pytest.hookimpl(optionalhook=True)
 def pytest_metadata(metadata):
+    """
+    Clear default pytest metadata.
+
+    Note: Custom environment information (AMDGPU Driver, Cluster Nodes, Images)
+    is added via pytest_html_results_summary hook instead, which runs after
+    fixtures execute and have populated the necessary pytest._ attributes.
+    """
     metadata.clear()
 
 class Context(object):
@@ -467,9 +488,21 @@ def pytest_runtest_makereport(item, call):
         # Get the docstring from the test function
         description = str(item.function.__doc__) if item.function.__doc__ else ""
 
-        # Add the description to the report object
+        # Format the description to preserve structure
         if description:
-            report.description = description
+            # Clean up the docstring (remove common leading whitespace)
+            import textwrap
+            import re
+            description = textwrap.dedent(description).strip()
+
+            # Extract first paragraph as summary (before first blank line)
+            parts = description.split('\n\n', 1)
+            summary = parts[0].replace('\n', ' ')
+
+            # Store only the summary (first paragraph) for the description column
+            report.description = summary
+        else:
+            report.description = ""
 
         if report.failed:
             # 1. Get the raw error message
@@ -506,10 +539,10 @@ def pytest_runtest_setup(item):
 def pytest_configure(config):
     """
     Add custom CSS styling to the HTML report for better aesthetics.
+    Writes CSS to a temporary file and registers it with pytest-html.
     """
-    # Add custom CSS to the HTML report
+    # Define custom CSS content
     css_content = """
-    <style>
         /* ==================== Color Scheme ==================== */
         :root {
             --amd-red: #ed1c24;
@@ -567,13 +600,51 @@ def pytest_configure(config):
         }
 
         /* ==================== Summary Section ==================== */
-        #environment, .metadata {
+        /* Hide empty environment section and its header */
+        #environment-header, #environment {
+            display: none !important;
+        }
+
+        .metadata {
             background: var(--white);
             padding: 25px;
             border-radius: 10px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
             margin: 20px 0;
             border-left: 5px solid var(--amd-red);
+        }
+
+        /* Environment table styling for proper vertical layout */
+        #environment td {
+            padding: 12px 15px !important;
+            vertical-align: top !important;
+            border-bottom: 1px solid var(--border-color) !important;
+        }
+
+        #environment tr:first-child td {
+            font-weight: 600;
+            color: var(--text-dark);
+            min-width: 200px;
+        }
+
+        #environment tr:nth-child(odd) {
+            background-color: #f8f9fa !important;
+        }
+
+        #environment tr:last-child td {
+            border-bottom: none !important;
+        }
+
+        /* Format nested lists in environment section */
+        #environment ul {
+            margin: 0 !important;
+            padding: 0 0 0 20px !important;
+            list-style-type: disc !important;
+        }
+
+        #environment ul li {
+            margin: 4px 0 !important;
+            line-height: 1.6 !important;
         }
 
         .summary {
@@ -723,15 +794,28 @@ def pytest_configure(config):
 
         /* ==================== Description & Failure Message ==================== */
         .col-description {
-            font-style: italic;
-            color: var(--text-muted);
-            max-width: 400px;
-            line-height: 1.5;
+            color: var(--text-dark);
+            max-width: 500px;
+            line-height: 1.8;
+            white-space: normal;
+            word-wrap: break-word;
         }
 
+        /* First paragraph/line should be bold (summary) */
         .col-description::first-line {
-            font-weight: 600;
-            color: var(--text-dark);
+            font-weight: 700;
+            color: var(--amd-red);
+            font-size: 14px;
+        }
+
+        /* Add spacing between paragraphs */
+        td.col-description {
+            padding: 15px !important;
+        }
+
+        /* Make description more readable */
+        td.col-description br {
+            line-height: 2.5;
         }
 
         /* ==================== Collapsible Sections ==================== */
@@ -779,6 +863,7 @@ def pytest_configure(config):
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
             border: none !important;
             margin: 20px 0 !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
 
         table[style*="border: 1px solid black"] th {
@@ -789,12 +874,31 @@ def pytest_configure(config):
             padding: 15px !important;
             border: none !important;
             letter-spacing: 0.5px !important;
+            font-size: 13px !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
 
         table[style*="border: 1px solid black"] td {
             padding: 12px 15px !important;
             border: none !important;
             border-bottom: 1px solid var(--border-color) !important;
+            font-size: 14px !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+            color: var(--text-dark) !important;
+            line-height: 1.6 !important;
+        }
+
+        /* First column in custom tables (labels/names) should be bold */
+        table[style*="border: 1px solid black"] td:first-child {
+            font-weight: 600 !important;
+            color: var(--text-dark) !important;
+        }
+
+        /* Data columns should use monospace for technical values */
+        table[style*="border: 1px solid black"] td:not(:first-child) {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+            font-size: 13px !important;
+            color: #495057 !important;
         }
 
         table[style*="border: 1px solid black"] tr:last-child td {
@@ -803,6 +907,10 @@ def pytest_configure(config):
 
         table[style*="border: 1px solid black"] tr:hover {
             background-color: #f8f9fa !important;
+        }
+
+        table[style*="border: 1px solid black"] tr:hover td {
+            color: var(--text-dark) !important;
         }
 
         /* ==================== AMD Branding Elements ==================== */
@@ -901,11 +1009,26 @@ def pytest_configure(config):
             margin-left: auto;
             margin-right: auto;
         }
-    </style>
     """
 
-    config._html_css_content = css_content
+    # For pytest-html 4.x, we need to write CSS to a file and add it via --css option
+    # Only do this if HTML reporting is enabled
+    if config.getoption('htmlpath'):
+        import tempfile
+        import os
 
-    # This will be injected into the HTML report
-    if hasattr(config, '_html'):
-        config._html.append(css_content)
+        # Create a temporary CSS file in the logs directory (so it persists for debugging)
+        log_dir = os.path.join(os.getcwd(), 'logs')
+        os.makedirs(log_dir, exist_ok=True)
+
+        css_file_path = os.path.join(log_dir, 'pytest_custom.css')
+
+        # Write CSS content to file
+        with open(css_file_path, 'w') as css_file:
+            css_file.write(css_content)
+
+        # Add CSS file to pytest-html's css option
+        # This is how pytest-html 4.x expects custom CSS
+        if not hasattr(config.option, 'css'):
+            config.option.css = []
+        config.option.css.append(css_file_path)

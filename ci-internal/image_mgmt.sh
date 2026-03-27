@@ -134,27 +134,27 @@ function load_images() {
 function bundle_images() {
     echo "Downloading all artifacts of gpu-operator to local folder : sandbox"
     rm -rf $PWD/sandbox && mkdir -p $PWD/sandbox
-    $PWD/ci-internal/flexibuilder/build.sh build-external-device-metrics-exporter-helm-artifact \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-device-metrics-exporter-helm-artifact \
         --alien-repo pensando/device-metrics-exporter --alien-target build-helm-artifact --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-device-metrics-exporter \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-device-metrics-exporter \
         --alien-repo pensando/device-metrics-exporter --alien-target build-device-metrics-exporter-docker-ubi9.6 --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-test-runner \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-test-runner \
         --alien-repo pensando/device-metrics-exporter --alien-target build-test-runner-docker --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-test-runner-agfhc \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-test-runner-agfhc \
        --alien-repo pensando/device-metrics-exporter --alien-target build-test-runner-docker-agfhc --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-config-manager \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-config-manager \
        --alien-repo pensando/device-config-manager --alien-target build-device-config-manager-docker-ubi9 --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-manager \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-manager \
        --alien-repo pensando/kernel-module-management --alien-target build-kernel-module-management --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-signimage \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-signimage \
        --alien-repo pensando/kernel-module-management --alien-target build-signer --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-webhook-server \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-webhook-server \
        --alien-repo pensando/kernel-module-management --alien-target build-webhook-server --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-worker \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-external-kernel-module-worker \
        --alien-repo pensando/kernel-module-management --alien-target build-worker --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-gpu-operator \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-gpu-operator \
        --alien-repo pensando/gpu-operator --alien-target build-gpu-operator --alien-branch ${BRANCH}
-    $PWD/ci-internal/flexibuilder/build.sh build-gpu-operator-k8s \
+    CI_USE_SANITY_BUILD=1 $PWD/ci-internal/flexibuilder/build.sh build-gpu-operator-k8s \
        --alien-repo pensando/gpu-operator --alien-target build-gpu-operator-k8s --alien-branch ${BRANCH}
     cp $PWD/ci-internal/sandbox-sanity-images.yml $PWD/sandbox
     cp $PWD/ci-internal/k8_jobd_ctl.py $PWD/sandbox
