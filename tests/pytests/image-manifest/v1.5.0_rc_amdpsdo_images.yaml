@@ -103,6 +103,13 @@ images:
             version     : 1.36
             kind        : container
 
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://<registry>/amdpsdo/k8s-gpu-dra-driver
+            version     : v1.5.0-345
+            kind        : container
+            secret      : docker-amdpsdo-auth
+
     openshift:
         driver:
             key         : driver.image
@@ -166,6 +173,13 @@ images:
             location    : container://registry.test.pensando.io:5000/busybox
             version     : 1.36
             kind        : container
+
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
+            version     : 5a66d18e
+            kind        : container
+            secret      : docker-amdpsdo-auth
 
     standalone:
         driver:
@@ -241,4 +255,12 @@ images:
             location    : container://registry.test.pensando.io:5000/busybox
             version     : 1.36
             kind        : container
+
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
+            version     : 5a66d18e
+
+            kind        : container
+            secret      : docker-amdpsdo-auth
 

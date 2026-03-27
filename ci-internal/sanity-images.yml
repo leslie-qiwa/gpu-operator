@@ -71,6 +71,12 @@ images:
             version     : labeller-latest
             kind        : container
 
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
+            version     : 5a66d18e
+            kind        : container
+
         kmm-controller-manager-image-sign:
             key         : kmm.controller.manager.env.relatedImageSign
             image       : file:///kernel-module-management/kernel-module-management-signimage.tar.gz
@@ -234,6 +240,12 @@ images:
             key         : devicePlugin.nodeLabellerImage
             location    : container://<registry>/rocm/k8s-device-plugin
             version     : labeller-latest
+            kind        : container
+
+        dra-driver-image:
+            key         : draDriver.image
+            location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
+            version     : 5a66d18e
             kind        : container
 
         init-container-image:

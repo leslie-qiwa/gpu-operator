@@ -451,10 +451,18 @@ device_config_template_v1_5_0 = {
                 'upgradeStrategy' : 'RollingUpdate',
             },
         },
+        'draDriver' : {
+            'enable' : False,
+            'imagePullPolicy' : 'IfNotPresent',
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+        },
         'selector' : {
             'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
         },
-        'remediationWorkflow': { 
+        'remediationWorkflow': {
             'autoStartWorkflow': True,
             'enable': False,
             'ttlForFailedWorkflows': '24h'
@@ -560,10 +568,18 @@ device_config_template_main = {
                 'upgradeStrategy' : 'RollingUpdate',
             },
         },
+        'draDriver' : {
+            'enable' : False,
+            'imagePullPolicy' : 'IfNotPresent',
+            'upgradePolicy' : {
+                'maxUnavailable' : 1,
+                'upgradeStrategy' : 'RollingUpdate',
+            },
+        },
         'selector' : {
             'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
         },
-        'remediationWorkflow': { 
+        'remediationWorkflow': {
             'autoStartWorkflow': True,
             'enable': False,
             'ttlForFailedWorkflows': '24h'
@@ -782,6 +798,9 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
             img = f"{spec.get('devicePlugin.nodeLabellerImage.repository')}:{spec.get('devicePlugin.nodeLabellerImage.version')}"
             device_config['spec']['devicePlugin']['nodeLabellerImage'] = img
         device_config['spec']['devicePlugin']['enableNodeLabeller'] = spec.get('devicePlugin.enableNodeLabeller', False)
+        # enableDevicePlugin field (for DRA driver compatibility)
+        if spec.get('devicePlugin.enableDevicePlugin', None) is not None:
+            device_config['spec']['devicePlugin']['enableDevicePlugin'] = spec.get('devicePlugin.enableDevicePlugin', True)
         if gpu_op_version >= version.Version("v1.2.0"):
             device_config['spec']['devicePlugin']['upgradePolicy']['maxUnavailable'] = spec.get('devicePlugin.upgradePolicy.maxUnavailable', 1)
             device_config['spec']['devicePlugin']['upgradePolicy']['upgradeStrategy'] = spec.get('devicePlugin.upgradePolicy.upgradeStrategy', 'RollingUpdate')
@@ -917,6 +936,23 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
                 }
             device_config['spec']['configManager']['upgradePolicy']['maxUnavailable'] = spec.get('configManager.upgradePolicy.maxUnavailable', 1)
             device_config['spec']['configManager']['upgradePolicy']['upgradeStrategy'] = spec.get('configManager.upgradePolicy.upgradeStrategy', 'RollingUpdate')
+
+    # dra-driver
+    if 'draDriver' in device_config['spec']:
+        if not skip_sections.get('draDriver', False):
+            if spec.get('draDriver.image.repository', None):
+                img = f"{spec.get('draDriver.image.repository')}:{spec.get('draDriver.image.version')}"
+                device_config['spec']['draDriver']['image'] = img
+            device_config['spec']['draDriver']['enable'] = spec.get('draDriver.enable', False)
+            device_config['spec']['draDriver']['imagePullPolicy'] = spec.get('draDriver.imagePullPolicy', 'IfNotPresent')
+            if spec.get('draDriver.image.secret', None):
+                device_config['spec']['draDriver']['imageRegistrySecret'] = {
+                        'name' : spec.get('draDriver.image.secret')
+                }
+            device_config['spec']['draDriver']['upgradePolicy']['maxUnavailable'] = spec.get('draDriver.upgradePolicy.maxUnavailable', 1)
+            device_config['spec']['draDriver']['upgradePolicy']['upgradeStrategy'] = spec.get('draDriver.upgradePolicy.upgradeStrategy', 'RollingUpdate')
+        else:
+            del device_config['spec']['draDriver']
 
     # selector
     if spec.get('selector.field', None) and spec.get('selector.value', None):
