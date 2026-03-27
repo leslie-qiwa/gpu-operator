@@ -362,58 +362,9 @@ def extract_partition_info(environment, amd_smi_partition_json):
         partition_status[entry["gpu_id"]] = f"{entry['accelerator_type']}_{entry['memory']}"
     return partition_status
 
-def parse_amd_smi_json(environment, output, profile, gpu_series):
-    global Logger
-"""
-    factor_dict = {
-            "SPX_NPS1": 1,
-            "CPX_NPS1": 8,
-            "CPX_NPS4": 8,
-            "DPX_NPS2": 2,
-            "DPX_NPS1": 2,
-            "QPX_NPS1": 4,
-            "QPX_NPS4": 4
-    }
-    factor = factor_dict[profile]
-    uuid = None
-    jsonout = json.loads(output.replace("'", '"'))
-    gpus = len(jsonout)
-    if "MI300" in gpu_series:
-        if 'SPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 1, f"no. of GPUs should be 1, found {len(jsonout)}")
-        elif 'CPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 8, f"no. of GPUs should be 8, found {len(jsonout)}")
-    elif "MI350" in gpu_series:
-        if 'SPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 8, f"no. of GPUs should be 8, found {len(jsonout)}")
-        elif 'CPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 63, f"no. of GPUs should be 63, found {len(jsonout)}")
-        elif 'QPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 32, f"no. of GPUs should be 32, found {len(jsonout)}")
-        elif 'DPX' in profile:
-            debug_on_failure(environment, len(jsonout) == 16, f"no. of GPUs should be 16, found {len(jsonout)}")
-        else:
-            pytest.fail(f"unknown profile {profile}")
-    GPUs = {}
-    partitions = {}
-    for gpu in jsonout:
-        i = gpu.get("gpu")
-        this_uuid = gpu.get("uuid")
-        if i % factor == 0 or i == 47:
-             uuid = this_uuid
-
-        partition_id = gpu.get("partition_id")
-        debug_on_failure(environment, partition_id != None, f'didnt find partition_id in {pprint.pprint(gpu)}')
-        partitions[i] = partition_id
-        GPUs[i] = True
-        #TODO Praveen kumar Shanmugam: That's a limitation from day 1. Iirc there is a tracking bug on swdev
-        debug_on_failure(environment, gpu.get("uuid"), f'didnt find uuid in {pprint.pformat(gpu)}')
-        debug_on_failure(environment, gpu.get("node_id") != None, f'didnt find node_id in {pprint.pformat(gpu)}')
-        debug_on_failure(environment, gpu.get("bdf") != None, f'didnt find bdf in {pprint.pformat(gpu)}')
-        debug_on_failure(environment, gpu.get("kfd_id") != None, f'didnt find kfd_id in {pprint.pformat(gpu)}')
-    Logger.info(f"profile is {profile} GPUS {pprint.pformat(GPUs)}")
-    Logger.info(f"{pprint.pformat(partitions)}")
-"""
+# Dead code - parse_amd_smi_json() is not called anywhere in the test suite
+# Removing to avoid confusion. If needed in the future, the validation logic
+# can be restored from git history.
 
 @pytest.mark.level11
 def test_deviceconfig_config_manager_deploy(deviceconfig_install, gpu_cluster, environment):
@@ -1028,6 +979,24 @@ def test_partitioning_workload_MI350X(gpu_cluster, deviceconfig_install, environ
     run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = True)
 
 @pytest.mark.level2
+@pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS2", "DPX_NPS1", "CPX_NPS1", "CPX_NPS2", "SPX_NPS1"])
+def test_partitioning_no_workload_MI350P(gpu_cluster, deviceconfig_install, environment, request,
+                                         create_dcm_configmap, profile):
+    gpu_series = get_gpu_series(gpu_cluster, environment)
+    if gpu_series != 'MI350P':
+        pytest.skip(f"Testcases specifically designed for MI350P")
+    run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = False)
+
+@pytest.mark.level2
+@pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS2", "QPX_NPS2", "DPX_NPS1", "CPX_NPS1", "CPX_NPS2", "SPX_NPS1"])
+def test_partitioning_workload_MI350P(gpu_cluster, deviceconfig_install, environment, request,
+                                         create_dcm_configmap, profile):
+    gpu_series = get_gpu_series(gpu_cluster, environment)
+    if gpu_series != 'MI350P':
+        pytest.skip(f"Testcases specifically designed for MI350P")
+    run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = True)
+
+@pytest.mark.level2
 @pytest.mark.parametrize("profile", ["QPX_NPS1", "DPX_NPS1", "QPX_NPS4", "CPX_NPS1", "CPX_NPS4", "SPX_NPS1"])
 def test_partitioning_no_workload_MI300X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
@@ -1064,7 +1033,7 @@ def test_partitioning_workload_MI325X(gpu_cluster, deviceconfig_install, environ
 @pytest.mark.parametrize("profile", ["CPX_NPS1"])
 def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, environment, request, profile):
     gpu_series = get_gpu_series(gpu_cluster, environment)
-    if 'MI350x' not in gpu_series:
+    if 'MI350X' not in gpu_series:
         pytest.skip(f"Testcases specifically designed for MI350X")
     run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = False)
     def _cleanup_workload():
@@ -1083,7 +1052,38 @@ def test_partitioning_63_workloads_MI350X(gpu_cluster, deviceconfig_install, env
             }
             wl_ctxt = K8Helper.workload_operation(environment, K8Helper.WorkloadOp.START_WORKLOAD, **params)
     time.sleep(60)
-    list_of_pods = k8_util.k8_get_pods("default")
+    ret_code, list_of_pods = k8_util.k8_get_pods("default")
+
+    debug_on_failure(environment, len(list_of_pods) == 63,
+                     f"found no running workloads in {pprint.pformat(list_of_pods)}")
+
+    exporter_nodeport_exp_config(request, gpu_cluster, deviceconfig_install, environment)
+
+@pytest.mark.level23
+@pytest.mark.parametrize("profile", ["CPX_NPS1"])
+def test_partitioning_63_workloads_MI350P(gpu_cluster, deviceconfig_install, environment, request,
+                                          create_dcm_configmap, profile):
+    gpu_series = get_gpu_series(gpu_cluster, environment)
+    if 'MI350P' not in gpu_series:
+        pytest.skip(f"Testcases specifically designed for MI350P")
+    run_partition_test_scenario(gpu_cluster, environment, request, profile, workload = False)
+    def _cleanup_workload():
+        k8_util.k8_delete_all_pods("default")
+
+    request.addfinalizer(_cleanup_workload)
+    _cleanup_workload()
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    for node in gpu_nodes:
+        worker = k8_util.k8_get_node_hostname(node)
+        for i in range(63):
+            params = {
+                "node_name" : worker,
+                "num_gpu_reqd" : 1,
+                "workload_selection" : "alexnet-tf-gpu"
+            }
+            wl_ctxt = K8Helper.workload_operation(environment, K8Helper.WorkloadOp.START_WORKLOAD, **params)
+    time.sleep(60)
+    ret_code, list_of_pods = k8_util.k8_get_pods("default")
 
     debug_on_failure(environment, len(list_of_pods) == 63,
                      f"found no running workloads in {pprint.pformat(list_of_pods)}")

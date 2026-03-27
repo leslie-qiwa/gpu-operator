@@ -78,6 +78,12 @@
         },
         {
             "device-id" : [
+                "0x75a8"
+            ],
+            "series" : "MI350P"
+        },
+        {
+            "device-id" : [
                 "0x75a3"
             ],
             "series" : "MI355X"
