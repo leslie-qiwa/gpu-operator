@@ -25,7 +25,7 @@ images:
             kind        : container
 
         gpu-operator-utils:
-            key         : commonConfig.utilsContainer.image
+            key         : commonConfig.utilsContainer
             image       : file:///gpu-operator/gpu-operator-utils.tar.gz
             kind        : container
 
@@ -202,7 +202,7 @@ images:
             secret      : docker-amdpsdo-auth
 
         gpu-operator-utils:
-            key         : commonConfig.utilsContainer.image
+            key         : commonConfig.utilsContainer
             image       : file:///gpu-operator/gpu-operator-utils.tar.gz
             kind        : container
 

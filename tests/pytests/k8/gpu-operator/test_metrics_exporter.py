@@ -1796,7 +1796,7 @@ def test_exporter_rbac_mTLS_cert_support(gpu_cluster, deviceconfig_install, envi
         node_hostname = k8_util.k8_get_node_hostname(node)
         node_port = deviceconfig_install.exporter_port_map[node_hostname]
         ret_code, ret_stdout, ret_stderr = cluster_node.session_https_get(node_port, "metrics", cert=(client_crt_path,client_key_path) , verify=ca_crt_path, CN="my-metrics-service")
-        K8Helper.triage(environment, (ret_code== 0), (f"Failed to get metrics via mTLS from service endpoint {node_ip}:{node_port}, stdout: {result.stdout} stderr: {result.stderr}"))
+        K8Helper.triage(environment, (ret_code== 0), (f"Failed to get metrics via mTLS from service endpoint {node_ip}:{node_port}, stdout: {ret_stdout} stderr: {ret_stderr}"))
 
     # Teardown / Restore: Disable rbac (https) in DeviceConfig
     for spec_name, tcfg in deviceconfig_install.test_cfg_map.items():

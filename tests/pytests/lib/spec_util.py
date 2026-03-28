@@ -241,11 +241,6 @@ device_config_template_v1_3_0 = {
         'selector' : {
             'feature.node.kubernetes.io/amd-gpu' : DQ('true'),
         },
-        'remediationWorkflow': { 
-            'autoStartWorkflow': True,
-            'enable': False,
-            'ttlForFailedWorkflows': '24h'
-        },
     },
 }
 
@@ -831,6 +826,9 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
                 del device_config['spec']['metricsExporter']['config']
         device_config['spec']['metricsExporter']['rbacConfig']['enable'] = spec.get('metricsExporter.rbacConfig.enable', False)
         device_config['spec']['metricsExporter']['rbacConfig']['disableHttps'] = spec.get('metricsExporter.rbacConfig.disableHttps', True)
+        if spec.get('metricsExporter.rbacConfig.secret.name' ,None):
+                device_config['spec']['metricsExporter']['rbacConfig'].setdefault('secret', {})
+                device_config['spec']['metricsExporter']['rbacConfig']['secret']['name'] = spec.get('metricsExporter.rbacConfig.secret.name', None)
         if spec.get('metricsExporter.image.secret', None):
             device_config['spec']['metricsExporter']['imageRegistrySecret'] = {
                     'name' : spec.get('metricsExporter.image.secret')
@@ -838,7 +836,7 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
         if gpu_op_version >= version.Version('v1.2.0'):
             device_config['spec']['metricsExporter']['upgradePolicy']['maxUnavailable'] = spec.get('metricsExporter.upgradePolicy.maxUnavailable', 1)
             device_config['spec']['metricsExporter']['upgradePolicy']['upgradeStrategy'] = spec.get('metricsExporter.upgradePolicy.upgradeStrategy', 'RollingUpdate')
-        if gpu_op_version > version.Version('v1.2.0'):
+        if gpu_op_version >= version.Version('v1.2.2'):
             if spec.get('prometheus.serviceMonitor.enable', False):
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor']['enable'] = True
             if spec.get('prometheus.serviceMonitor.honorLabels', False):
@@ -851,15 +849,6 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor']['attachMetadata']['node'] = spec.get('prometheus.serviceMonitor.attachMetadata.node', True)
             if spec.get('prometheus.serviceMonitor.relabelings',None):
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor']['relabelings'] = spec.get('prometheus.serviceMonitor.relabelings', [])
-        if gpu_op_version >= version.Version('v1.4.1'):
-            device_config['spec']['metricsExporter']['podAnnotations'] = spec.get('metricsExporter.podAnnotations', {})
-            device_config['spec']['metricsExporter']['serviceAnnotations'] = spec.get('metricsExporter.serviceAnnotations', {})
-            if spec.get('metricsExporter.rbacConfig.secret.name' ,None):
-                device_config['spec']['metricsExporter']['rbacConfig'].setdefault('secret', {})
-                device_config['spec']['metricsExporter']['rbacConfig']['secret']['name'] = spec.get('metricsExporter.rbacConfig.secret.name', None)
-            if spec.get('metricsExporter.rbacConfig.clientCAConfigMap.name' ,None):
-                device_config['spec']['metricsExporter']['rbacConfig'].setdefault('clientCAConfigMap', {})
-                device_config['spec']['metricsExporter']['rbacConfig']['clientCAConfigMap']['name'] = spec.get('metricsExporter.rbacConfig.clientCAConfigMap.name', None)
             if spec.get('prometheus.serviceMonitor.labels',None):
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor']['labels'] = spec.get('prometheus.serviceMonitor.labels', {})
             if spec.get('prometheus.serviceMonitor.tlsConfig.ca.configMap', None) :
@@ -877,6 +866,12 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
             if spec.get('prometheus.serviceMonitor.tlsConfig.insecureSkipVerify', None):
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor'].setdefault('tlsConfig', {})
                 device_config['spec']['metricsExporter']['prometheus']['serviceMonitor']['tlsConfig']['insecureSkipVerify'] = spec.get('prometheus.serviceMonitor.tlsConfig.insecureSkipVerify', False)
+            if spec.get('metricsExporter.rbacConfig.clientCAConfigMap.name' ,None):
+                device_config['spec']['metricsExporter']['rbacConfig'].setdefault('clientCAConfigMap', {})
+                device_config['spec']['metricsExporter']['rbacConfig']['clientCAConfigMap']['name'] = spec.get('metricsExporter.rbacConfig.clientCAConfigMap.name', None)
+        if gpu_op_version >= version.Version('v1.4.0'):
+            device_config['spec']['metricsExporter']['podAnnotations'] = spec.get('metricsExporter.podAnnotations', {})
+            device_config['spec']['metricsExporter']['serviceAnnotations'] = spec.get('metricsExporter.serviceAnnotations', {})
     else:
         del device_config['spec']['metricsExporter']
 
@@ -959,14 +954,23 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
         device_config['spec']['selector'] = {
             spec.get('selector.field', 'feature.node.kubernetes.io/amd-gpu') : spec.get('selector.value', DQ('true')),
         }
-
-    # remediationWorkflow
+    # Remediation Workflow:
     if 'remediationWorkflow' in device_config['spec']:
         device_config['spec']['remediationWorkflow'] = {}
         if not skip_sections.get('remediationWorkflow', False):
-            device_config['spec']['remediationWorkflow']['enable'] = spec.get('remediationWorkflow.enable', False)
-            device_config['spec']['remediationWorkflow']['autoStartWorkflow'] = spec.get('remediationWorkflow.autoStartWorkflow', True)
-            device_config['spec']['remediationWorkflow']['ttlForFailedWorkflows'] = spec.get('remediationWorkflow.ttlForFailedWorkflows', '24h')
+            if spec.get('remediationWorkflow.enable', None):
+                device_config['spec']['remediationWorkflow']['enable'] = spec.get('remediationWorkflow.enable', False)
+            if spec.get('remediationWorkflow.autoStartWorkflow', None):
+                device_config['spec']['remediationWorkflow']['autoStartWorkflow'] = spec.get('remediationWorkflow.autoStartWorkflow', True)
+            if spec.get('remediationWorkflow.ttlForFailedWorkflows', None):
+                device_config['spec']['remediationWorkflow']['ttlForFailedWorkflows'] = spec.get('remediationWorkflow.ttlForFailedWorkflows', '24h')
+            if spec.get('remediationWorkflow.config', None):
+                device_config['spec']['remediationWorkflow']['config'] = {
+                    'name' : spec.get('remediationWorkflow.config', None),
+                    }
+            if spec.get('remediationWorkflow.testerImage.repository', None) and spec.get('remediationWorkflow.testerImage.version', None):
+                img = f"{spec.get('remediationWorkflow.testerImage.repository')}:{spec.get('remediationWorkflow.testerImage.version')}"
+                device_config['spec']['remediationWorkflow']['testerImage'] = img      
         else:
             del device_config['spec']['remediationWorkflow']
 

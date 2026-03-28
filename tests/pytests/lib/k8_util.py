@@ -1223,31 +1223,32 @@ def k8_check_pod_terminated(namespace : str, pod_list : List, sleep_time : int =
     return running_pods
 
 @log_arguments
-def k8_create_configmap(namespace : str, configmap_name : str, configmap_json_file : str):
+def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : str):
     """
     API to create configmap in a k8-cluster
 
     Example: kubectl create configmap -n kube-amd-gpu exporter-config --from-file=config.json
     - If the input file has .json extension, store raw file content under "config.json".
     - If the input file has .crt extension, store raw file content under file name.
+    - If the input file has .yaml extension, store raw file content under workflow name.
     """
     global Logger 
-    if configmap_json_file:
-        if os.path.splitext(configmap_json_file)[1] == '.json' : 
-            with open(configmap_json_file) as fp:
-                data = json.load(fp)
-            data = {"config.json" : json.dumps(data)}
-        elif os.path.splitext(configmap_json_file)[1] == '.crt' : 
-            with open(configmap_json_file, "r", encoding="utf-8") as fp:
-                raw_text = fp.read()
-            data = {os.path.basename(configmap_json_file) : raw_text}
-        else:
-            Logger.error(
-                f"Unsupported file type for '{configmap_json_file}'. "
-                "Expected a file with .json or .crt extension.")
-            return -1, "", f"Unsupported file type: {configmap_json_file}"
+    if os.path.splitext(configmap_file)[1] == '.json' : 
+        with open(configmap_file) as fp:
+            data = json.load(fp)
+        data = {"config.json" : json.dumps(data)}
+    elif os.path.splitext(configmap_file)[1] == '.crt' : 
+        with open(configmap_file, "r", encoding="utf-8") as fp:
+            raw_text = fp.read()
+        data = {os.path.basename(configmap_file) : raw_text}
+    elif os.path.splitext(configmap_file)[1] == '.yaml':
+        with open(configmap_file, "r") as fp:
+            data = {"workflow": fp.read()}
     else:
-        data = {}
+        Logger.error(
+            f"Unsupported file type for '{configmap_file}'. "
+            "Expected a file with .json, .crt, .yaml extension.")
+        return -1, "", f"Unsupported file type: {configmap_file}"
     api = client.CoreV1Api()
     config_map = client.V1ConfigMap(
             api_version = "v1",
@@ -2645,3 +2646,55 @@ def k8_patch_node_status(node_name, status_body):
         error_msg = f"Unexpected error: {str(e)}"
         Logger.error(error_msg)
         return -1, None, error_msg
+
+
+@log_arguments
+def k8_patch_workflow_config(namespace: str, configmap_name: str, patch_body: dict):
+    """
+    patch a workflow entry using the exact YAML structure.
+
+    """
+    global Logger
+    api = client.CoreV1Api()
+    target_node = patch_body.get("nodeCondition")
+    if not target_node:
+        return -1, None, "patch_body must contain 'nodeCondition' to identify which entry to fix."
+
+    try:
+        cm = api.read_namespaced_config_map(name=configmap_name, namespace=namespace)
+        workflow_str = cm.data.get("workflow", "")
+        if not workflow_str:
+            return 404, None, "Workflow field missing in ConfigMap"
+
+        workflow_list = yaml.safe_load(workflow_str)
+
+        found = False
+        for entry in workflow_list:
+            if entry.get("nodeCondition") == target_node:
+                for key, value in patch_body.items():
+                    if isinstance(value, dict) and key in entry:
+                        entry[key].update(value)
+                    else:
+                        entry[key] = value
+                found = True
+                break
+        
+        if not found:
+            return 404, None, f"Node condition '{target_node}' not found in the workflow list."
+
+        updated_workflow_str = yaml.dump(workflow_list, default_flow_style=False)
+        api_body = {"data": {"workflow": updated_workflow_str}}
+        
+        api_response = api.patch_namespaced_config_map(
+            name=configmap_name,
+            namespace=namespace,
+            body=api_body
+        )
+        
+        Logger.info(f"Successfully patched {target_node} in {configmap_name}")
+        return 0, api_response, ""
+
+    except ApiException as e:
+        return e.status, None, f"ApiException: {e.body}"
+    except Exception as e:
+        return -1, None, str(e)
