@@ -1,4 +1,4 @@
-from "registry.test.pensando.io:5000/gpu-operator-build:v1.3"
+from "registry.test.pensando.io:5000/gpu-operator-build:v1.5"
 
 run "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y podman kmod vim"
 
