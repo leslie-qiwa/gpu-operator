@@ -826,3 +826,322 @@ def verify_dra_driver_crds() -> Tuple[bool, List[str]]:
         Logger.error(f"DeviceClass API not available: {err}")
 
     return len(unavailable) == 0, unavailable
+
+
+# =============================================================================
+# DRA Test Helper Functions
+# Shared by k8/dra-driver/ and k8/gpu-operator/ test suites
+# =============================================================================
+
+
+def verify_dra_driver_pods_running(
+    namespace: str,
+    expected_pod_count: int,
+    pod_name_pattern: str = "dra-driver",
+    sleep_time: int = 20,
+) -> Tuple[bool, str]:
+    """
+    Verify DRA driver pods are running.
+    Shared helper for both standalone and operand DRA driver tests.
+
+    Args:
+        namespace: Namespace where DRA driver pods are deployed
+        expected_pod_count: Expected number of DRA driver pods (usually number of GPU nodes)
+        pod_name_pattern: Pattern to match pod names (default: "dra-driver")
+        sleep_time: Time to wait for pods to stabilize
+
+    Returns:
+        Tuple of (success, error_message)
+
+    Example:
+        success, err = verify_dra_driver_pods_running("kube-amd-gpu-dra", 2)
+        if not success:
+            pytest.fail(f"DRA driver pods not ready: {err}")
+    """
+    global Logger
+    import lib.common as common
+
+    expected_pods = [common.PodInfo(pod_name_pattern, expected_pod_count, 1)]
+    failed_pods = k8_util.k8_check_pod_running(
+        namespace, expected_pods, sleep_time=sleep_time
+    )
+
+    if failed_pods:
+        return False, f"DRA driver pods not ready: {failed_pods}"
+
+    Logger.info(
+        f"All {expected_pod_count} DRA driver pods are running in namespace {namespace}"
+    )
+    return True, ""
+
+
+def verify_device_class_exists(
+    api_version: str, device_class_name: str = "gpu.amd.com"
+) -> Tuple[bool, str, Optional[Dict]]:
+    """
+    Verify that a DeviceClass exists.
+
+    Args:
+        api_version: DRA API version (v1 or v1beta1)
+        device_class_name: Name of the DeviceClass to check
+
+    Returns:
+        Tuple of (exists, error_message, device_class_object)
+
+    Example:
+        exists, err, dc = verify_device_class_exists("v1", "gpu.amd.com")
+        if not exists:
+            pytest.fail(f"DeviceClass not found: {err}")
+    """
+    global Logger
+
+    ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
+        group=DRA_API_GROUP, version=api_version, plural="deviceclasses"
+    )
+
+    if ret_code != 0:
+        return False, f"Failed to get DeviceClasses: {err}", None
+
+    # Find the specific DeviceClass
+    for dc in device_classes:
+        if dc.get("metadata", {}).get("name") == device_class_name:
+            Logger.info(f"Found DeviceClass: {device_class_name}")
+            return True, "", dc
+
+    return False, f"DeviceClass '{device_class_name}' not found", None
+
+
+def verify_resource_slices_exist(
+    api_version: str, driver_name: str = "gpu.amd.com", min_count: int = 1
+) -> Tuple[bool, str, List[Dict]]:
+    """
+    Verify that ResourceSlices exist for a given driver.
+
+    Args:
+        api_version: DRA API version (v1 or v1beta1)
+        driver_name: Driver name to filter ResourceSlices (default: "gpu.amd.com")
+        min_count: Minimum expected number of ResourceSlices
+
+    Returns:
+        Tuple of (success, error_message, resource_slices_list)
+
+    Example:
+        success, err, slices = verify_resource_slices_exist("v1", "gpu.amd.com", min_count=2)
+        if not success:
+            pytest.fail(f"ResourceSlices check failed: {err}")
+    """
+    global Logger
+
+    ret_code, resource_slices, err = k8_util.k8_get_custom_resource_objects(
+        group=DRA_API_GROUP, version=api_version, plural="resourceslices"
+    )
+
+    if ret_code != 0:
+        return False, f"Failed to get ResourceSlices: {err}", []
+
+    # Filter for specific driver
+    driver_resource_slices = (
+        [
+            rs
+            for rs in resource_slices
+            if rs.get("spec", {}).get("driver") == driver_name
+        ]
+        if resource_slices
+        else []
+    )
+
+    if len(driver_resource_slices) < min_count:
+        return (
+            False,
+            f"Expected at least {min_count} ResourceSlices for driver '{driver_name}', found {len(driver_resource_slices)}",
+            driver_resource_slices,
+        )
+
+    Logger.info(
+        f"Found {len(driver_resource_slices)} ResourceSlices for driver '{driver_name}'"
+    )
+    return True, "", driver_resource_slices
+
+
+def wait_for_resource_slices_deletion(
+    api_version: str,
+    driver_name: str = "gpu.amd.com",
+    max_retries: int = 12,
+    retry_interval: int = 5,
+) -> Tuple[bool, str]:
+    """
+    Wait for ResourceSlices to be deleted (with retry).
+
+    Args:
+        api_version: DRA API version (v1 or v1beta1)
+        driver_name: Driver name to filter ResourceSlices
+        max_retries: Maximum number of retry attempts
+        retry_interval: Seconds to wait between retries
+
+    Returns:
+        Tuple of (deleted, error_message)
+
+    Example:
+        deleted, err = wait_for_resource_slices_deletion("v1", "gpu.amd.com")
+        if not deleted:
+            pytest.fail(f"ResourceSlices not deleted: {err}")
+    """
+    global Logger
+
+    for attempt in range(max_retries):
+        ret_code, resource_slices, err = k8_util.k8_get_custom_resource_objects(
+            group=DRA_API_GROUP, version=api_version, plural="resourceslices"
+        )
+
+        if ret_code != 0:
+            Logger.warning(
+                f"Failed to get ResourceSlices (attempt {attempt + 1}/{max_retries}): {err}"
+            )
+            time.sleep(retry_interval)
+            continue
+
+        # Filter for driver ResourceSlices
+        driver_resource_slices = (
+            [
+                rs
+                for rs in resource_slices
+                if rs.get("spec", {}).get("driver") == driver_name
+            ]
+            if resource_slices
+            else []
+        )
+
+        if len(driver_resource_slices) == 0:
+            Logger.info(
+                f"ResourceSlices deleted successfully (attempt {attempt + 1}/{max_retries})"
+            )
+            return True, ""
+        else:
+            Logger.info(
+                f"Waiting for ResourceSlices deletion (attempt {attempt + 1}/{max_retries}): "
+                f"{len(driver_resource_slices)} slices still exist"
+            )
+            time.sleep(retry_interval)
+
+    return (
+        False,
+        f"ResourceSlices not deleted within {max_retries * retry_interval} seconds",
+    )
+
+
+def verify_dra_installation(
+    namespace: str,
+    api_version: str,
+    expected_pod_count: int,
+    device_class_name: str = "gpu.amd.com",
+    driver_name: str = "gpu.amd.com",
+) -> Tuple[bool, str]:
+    """
+    Comprehensive DRA driver installation verification.
+    Checks: pods running, DeviceClass exists, ResourceSlices published.
+
+    This is a convenience function that combines multiple verification steps
+    commonly needed after DRA driver installation.
+
+    Args:
+        namespace: DRA driver namespace
+        api_version: DRA API version (v1 or v1beta1)
+        expected_pod_count: Expected number of DRA driver pods
+        device_class_name: Expected DeviceClass name (default: "gpu.amd.com")
+        driver_name: Expected driver name in ResourceSlices (default: "gpu.amd.com")
+
+    Returns:
+        Tuple of (success, error_message)
+
+    Example:
+        success, err = verify_dra_installation(
+            namespace="kube-amd-gpu-dra",
+            api_version="v1",
+            expected_pod_count=2
+        )
+        if not success:
+            pytest.fail(f"DRA installation verification failed: {err}")
+    """
+    global Logger
+
+    # Check pods
+    success, err = verify_dra_driver_pods_running(namespace, expected_pod_count)
+    if not success:
+        return False, f"Pod check failed: {err}"
+
+    # Check DeviceClass
+    exists, err, _ = verify_device_class_exists(api_version, device_class_name)
+    if not exists:
+        return False, f"DeviceClass check failed: {err}"
+
+    # Check ResourceSlices
+    success, err, _ = verify_resource_slices_exist(api_version, driver_name, min_count=1)
+    if not success:
+        return False, f"ResourceSlices check failed: {err}"
+
+    Logger.info("DRA driver installation verified successfully")
+    return True, ""
+
+
+def verify_dra_uninstallation(
+    namespace: str,
+    api_version: str,
+    driver_name: str = "gpu.amd.com",
+    max_wait_pods: int = 60,
+    max_wait_resources: int = 60,
+) -> Tuple[bool, str]:
+    """
+    Verify DRA driver is fully uninstalled.
+    Checks that pods are terminated and ResourceSlices are deleted.
+
+    Args:
+        namespace: DRA driver namespace
+        api_version: DRA API version (v1 or v1beta1)
+        driver_name: Driver name to check (default: "gpu.amd.com")
+        max_wait_pods: Max seconds to wait for pods to terminate
+        max_wait_resources: Max seconds to wait for ResourceSlices deletion
+
+    Returns:
+        Tuple of (success, error_message)
+
+    Example:
+        success, err = verify_dra_uninstallation(
+            namespace="kube-amd-gpu-dra",
+            api_version="v1"
+        )
+        if not success:
+            pytest.fail(f"DRA uninstallation verification failed: {err}")
+    """
+    global Logger
+    import lib.common as common
+
+    # Check pods are terminated
+    # k8_check_pod_terminated() has built-in retry logic with sleep_time and total_attempts
+    # Calculate retry parameters from max_wait_pods (default: 60s)
+    dra_pods = [common.PodInfo("dra-driver", 1, 1)]
+
+    sleep_interval = 5  # seconds between retries
+    total_attempts = max(1, max_wait_pods // sleep_interval)  # e.g., 60s / 5s = 12 attempts
+
+    running_pods = k8_util.k8_check_pod_terminated(
+        namespace, dra_pods, sleep_time=sleep_interval, total_attempts=total_attempts
+    )
+
+    if running_pods:
+        return False, f"DRA driver pods still running after {max_wait_pods}s: {running_pods}"
+
+    Logger.info("DRA driver pods terminated")
+
+    # Check ResourceSlices are deleted
+    # Calculate retry count from max_wait_resources, ensuring at least 1 retry
+    retry_interval = 5
+    max_retries = max(1, max_wait_resources // retry_interval)
+
+    success, err = wait_for_resource_slices_deletion(
+        api_version, driver_name, max_retries=max_retries, retry_interval=retry_interval
+    )
+    if not success:
+        return False, f"ResourceSlices deletion failed: {err}"
+
+    Logger.info("DRA driver uninstallation verified successfully")
+    return True, ""

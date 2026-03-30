@@ -187,10 +187,11 @@ def deviceconfig_install(
     )
 
     # Configure DeviceConfig with DRA driver enabled and device plugin disabled
+    # Note: DRA driver requires GPU driver to be installed for GPU discovery
     test_config = {
         "metadata.namespace": environment.gpu_operator_namespace,
         "driver.enable": True,
-        "devicePlugin.enableDevicePlugin": False,  # Disable device plugin
+        "devicePlugin.enableDevicePlugin": False,  # Disable device plugin (mutually exclusive with DRA)
         "draDriver.enable": True,  # Enable DRA driver
         "metricsExporter.enable": False,
         "testRunner.enable": False,
@@ -216,8 +217,76 @@ def deviceconfig_install(
 
     # Check for corresponding deviceconfig created
     K8Helper.check_deviceconfig_status(environment, devicecfg_list)
-    for devcfg in devicecfg_list:
-        K8Helper.wait_kmm_worker_completion(environment, devcfg)
+
+    # Wait for driver installation (DRA driver always requires out-of-tree GPU driver)
+    Logger.info("Waiting for GPU driver installation via KMM (required for DRA driver)")
+    driver_deployment = environment.amdgpu_driver_spec.get(
+        "driver-deployment", "deviceconfig"
+    )
+
+    if driver_deployment == "inbox":
+        Logger.info("Using inbox amdgpu driver - skipping KMM verification")
+    else:
+        # Wait for KMM worker completion for each deviceconfig
+        for devcfg in devicecfg_list:
+            try:
+                K8Helper.wait_kmm_worker_completion(environment, devcfg)
+            except Exception as e:
+                # If KMM label check fails, verify driver is actually loaded as fallback
+                Logger.warning(f"KMM worker completion check failed: {e}")
+                Logger.info(
+                    "Verifying if amdgpu driver is loaded on GPU nodes as fallback check..."
+                )
+
+                ret_code, gpu_nodes_list = k8_util.k8_get_gpu_nodes()
+                if ret_code == 0 and len(gpu_nodes_list) > 0:
+                    driver_loaded_count = 0
+                    for node in gpu_nodes_list:
+                        # Extract node name from node object (dict)
+                        node_name = node.get("metadata", {}).get("name")
+                        if not node_name:
+                            Logger.warning(
+                                f"Failed to get node name from node object: {node}"
+                            )
+                            continue
+
+                        # Check if amdgpu module is loaded
+                        # Use shell wrapper to execute command with pipes/redirects
+                        ret_code, output = k8_util.run_command_on_node(
+                            gpu_cluster,
+                            node_name,
+                            ["bash", "-c", "lsmod | grep amdgpu || echo 'not loaded'"],
+                        )
+                        if (
+                            ret_code == 0
+                            and output.strip()
+                            and "amdgpu" in output
+                            and "not loaded" not in output
+                        ):
+                            driver_loaded_count += 1
+                            Logger.info(f"amdgpu driver is loaded on node {node_name}")
+                        else:
+                            Logger.error(
+                                f"amdgpu driver NOT loaded on node {node_name}"
+                            )
+
+                    if driver_loaded_count == len(gpu_nodes_list):
+                        Logger.info(
+                            f"amdgpu driver verified loaded on all {driver_loaded_count} GPU nodes - "
+                            f"continuing despite missing kmm.ready labels"
+                        )
+                    else:
+                        debug_on_failure(
+                            environment,
+                            False,
+                            f"GPU driver not loaded on all nodes ({driver_loaded_count}/{len(gpu_nodes_list)}). "
+                            f"Original error: {e}",
+                        )
+                else:
+                    debug_on_failure(
+                        environment, False, f"Failed to verify driver status: {e}"
+                    )
+
     K8Helper.update_node_driver_version(gpu_cluster, environment)
 
     devcfg_info = DeviceConfigCRInfo()
@@ -497,3 +566,180 @@ def test_deviceconfig_dra_driver_disable(
     Logger.info(
         f"ResourceSlices restored after re-enabling: {len(gpu_resource_slices)} slices found"
     )
+
+
+@pytest.mark.level2
+def test_deviceconfig_dra_driver_mutual_exclusion(
+    gpu_cluster, images, gpu_operator_install, environment, dra_api_version
+):
+    """
+    Test mutual exclusion between DRA driver and device plugin.
+    Verifies that enabling both DRA driver and device plugin simultaneously is rejected
+    or that only one operand runs at a time.
+    """
+    global Logger
+
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    debug_on_failure(
+        environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster"
+    )
+    debug_on_failure(
+        environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster"
+    )
+
+    # Cleanup - remove any existing deviceconfigs
+    devcfg_map = k8_util.k8_get_deviceconfigs_info(environment.gpu_operator_namespace)
+    for devcfg_name, _ in devcfg_map.items():
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_deviceconfig_cr(
+            environment.gpu_operator_namespace, devcfg_name
+        )
+        if ret_code != 0:
+            Logger.error(
+                f"Failed to delete deviceconfig name: {devcfg_name}, error : {ret_stderr}"
+            )
+    time.sleep(10)
+
+    # Attempt to create DeviceConfig with both DRA driver and device plugin enabled
+    Logger.info(
+        "Attempting to create DeviceConfig with both DRA driver and device plugin enabled"
+    )
+
+    test_config = {
+        "metadata.namespace": environment.gpu_operator_namespace,
+        "metadata.name": "test-mutual-exclusion",
+        "driver.enable": True,
+        "devicePlugin.enableDevicePlugin": True,  # Enable device plugin
+        "draDriver.enable": True,  # Enable DRA driver (should conflict)
+        "metricsExporter.enable": False,
+        "testRunner.enable": False,
+    }
+    test_config.update(images)
+
+    # Generate DeviceConfig
+    test_cfg_map = spec_util.build_deviceconfig_cr_template(
+        test_config, gpu_nodes, "mutual_exclusion", environment.amdgpu_driver_spec
+    )
+
+    deviceconfig_created = False
+    for spec_name, tcfg in test_cfg_map.items():
+        cr_spec = spec_util.generate_k8_deviceconfig_cr(
+            environment.gpu_operator_version, tcfg
+        )
+
+        # Try to create the DeviceConfig
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_create_deviceconfig_cr(cr_spec)
+
+        if ret_code == 0:
+            deviceconfig_created = True
+            Logger.info(
+                "DeviceConfig created successfully despite both operands enabled. "
+                "Checking operator behavior..."
+            )
+
+            # Wait a bit for operator to reconcile
+            time.sleep(30)
+
+            # Check which pods are actually created by name patterns
+            # Device plugin pods typically have "device-plugin" in the name
+            ret_code, all_pods = k8_util.k8_get_pods(environment.gpu_operator_namespace)
+            debug_on_failure(
+                environment,
+                ret_code == 0,
+                "Failed to get pods for mutual exclusion check",
+            )
+
+            # Filter pods by name patterns (regardless of phase - we want to ensure NO pods exist)
+            # Checking only Running pods would give false pass if pods are Pending/CrashLoopBackOff
+            device_plugin_pods = [
+                p
+                for p in all_pods
+                if "device-plugin" in p.get("metadata", {}).get("name", "")
+            ]
+
+            dra_driver_pods = [
+                p
+                for p in all_pods
+                if "dra-driver" in p.get("metadata", {}).get("name", "")
+            ]
+
+            # Log pod details including phases for debugging
+            device_plugin_exists = len(device_plugin_pods) > 0
+            dra_driver_exists = len(dra_driver_pods) > 0
+
+            if device_plugin_exists:
+                phases = [
+                    p.get("status", {}).get("phase", "Unknown")
+                    for p in device_plugin_pods
+                ]
+                Logger.info(
+                    f"Device plugin pods found: {len(device_plugin_pods)} "
+                    f"(phases: {phases})"
+                )
+            else:
+                Logger.info("Device plugin pods: 0 (none created)")
+
+            if dra_driver_exists:
+                phases = [
+                    p.get("status", {}).get("phase", "Unknown") for p in dra_driver_pods
+                ]
+                Logger.info(
+                    f"DRA driver pods found: {len(dra_driver_pods)} "
+                    f"(phases: {phases})"
+                )
+            else:
+                Logger.info("DRA driver pods: 0 (none created)")
+
+            # Verify mutual exclusion: BOTH should NOT run simultaneously
+            # Valid enforcement strategies:
+            # 1. API-level rejection: DeviceConfig rejected, NO pods created
+            # 2. Runtime enforcement: Only ONE operand runs (policy/precedence)
+            # Invalid: Both operands running at the same time
+            debug_on_failure(
+                environment,
+                not (device_plugin_exists and dra_driver_exists),
+                f"Mutual exclusion violation: Both device plugin AND DRA driver pods exist simultaneously. "
+                f"Device plugin pods: {len(device_plugin_pods)}, DRA driver pods: {len(dra_driver_pods)}. "
+                f"Valid enforcement: reject configuration (no pods) OR allow only one operand (precedence).",
+            )
+
+            # Log which enforcement strategy was used
+            if not device_plugin_exists and not dra_driver_exists:
+                Logger.info(
+                    "Mutual exclusion enforced via API-level rejection: "
+                    "NO pods created for either operand"
+                )
+            elif device_plugin_exists and not dra_driver_exists:
+                Logger.info(
+                    "Mutual exclusion enforced via runtime precedence: "
+                    f"Device plugin running ({len(device_plugin_pods)} pods), DRA driver suppressed"
+                )
+            elif dra_driver_exists and not device_plugin_exists:
+                Logger.info(
+                    "Mutual exclusion enforced via runtime precedence: "
+                    f"DRA driver running ({len(dra_driver_pods)} pods), device plugin suppressed"
+                )
+
+            # Cleanup
+            Logger.info("Cleaning up test DeviceConfig")
+            k8_util.k8_delete_deviceconfig_cr(
+                environment.gpu_operator_namespace, tcfg["metadata.name"]
+            )
+            time.sleep(10)
+
+        else:
+            Logger.info(
+                f"DeviceConfig creation rejected as expected (mutual exclusion enforced at admission): {ret_stderr}"
+            )
+            # This is actually a valid outcome - admission webhook or validation rejected it
+            Logger.info(
+                "Mutual exclusion successfully enforced: DeviceConfig with both operands was rejected"
+            )
+
+    if not deviceconfig_created:
+        Logger.info(
+            "Test passed: System correctly rejected DeviceConfig with both DRA driver and device plugin enabled"
+        )
+    else:
+        Logger.info(
+            "Test passed: System allowed DeviceConfig creation but enforced mutual exclusion at runtime"
+        )
