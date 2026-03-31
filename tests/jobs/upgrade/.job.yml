@@ -1,0 +1,328 @@
+---
+version: 2.0
+meta:
+
+
+image:
+  bind_dir: "/gpu-operator"
+  work_dir: "/gpu-operator"
+
+
+e2e-targets:
+  gpu-operator-upgrade-base-v1.4.1:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.4.1 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.4.0:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.4.0 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.3.1:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.3.1 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.3.0:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.3.0 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.2.2:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.2.2 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.2.1:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.2.1 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.2.0:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.2.0 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.1.0:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.1.0 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+  gpu-operator-upgrade-base-v1.0.0:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_upgrade_tests.sh --deployment k8 --app gpu-operator \
+         --base-version v1.1.0 --testbed /warmd.json \
+         --seed-image-manifest /gpu-operator/ci-internal/sanity-images.yml"
+    ]
+    owners: ["email:srivatsa.sangli@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-device-metrics-exporter
+      - build-external-test-runner
+      - build-external-test-runner-agfhc
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+      - build-external-config-manager
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
+logfiles:
+  - /gpu-operator/tests/pytests/pytest_logs.tgz

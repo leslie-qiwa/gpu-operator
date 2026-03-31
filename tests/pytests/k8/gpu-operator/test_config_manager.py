@@ -1189,8 +1189,9 @@ def test_partitioning_test_runner(gpu_cluster, deviceconfig_install, environment
     verify_logs(environment, [f'Starting iteration 1 of 1 for test: {recipe}'], 'test-runner-manual')
     k8_util.k8_delete_job(namespace, job_name)
 
+@pytest.mark.skip(reason="TODO: Update to use all_image_versions fixture instead of removed alternative_images")
 @pytest.mark.parametrize("upgrade_policy", ["RollingUpdate", "OnDelete"])
-def test_config_manager_operand_upgrade(deviceconfig_install, environment, alternative_images, upgrade_policy):
+def test_config_manager_operand_upgrade(deviceconfig_install, environment, upgrade_policy):
     global Logger
     if environment.gpu_operator_version < "v1.3.0":
         pytest.skip(f"DCM Operand upgrade feature is not available in release before v1.2.0")

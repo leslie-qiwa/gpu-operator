@@ -64,13 +64,6 @@ def pytest_addoption(parser):
     )
 
     parser.addoption(
-            "--alternative-image-manifest",
-            action = "store",
-            default = None,
-            help = "Alternative Image manifest listing images to use for upgrade testing"
-    )
-
-    parser.addoption(
             "--secrets-json",
             action = "store",
             default = None,
@@ -96,6 +89,12 @@ def pytest_addoption(parser):
             action="store",
             default="alexnet-tf-gpu",
             help="Workload template to use",
+    )
+    parser.addoption(
+            "--base-version",
+            action="store",
+            default=None,
+            help="Base version for upgrade tests (e.g., v1.4.1)"
     )
 
 def pytest_html_results_summary(prefix, summary, postfix):
@@ -305,6 +304,13 @@ def images(request, gpu_cluster, environment):
 
     # Process metadata section of image-manifest
     image_metadata = image_manifest['images'].get('meta', {})
+
+    # Optional metadata validation (warn if missing, don't fail)
+    if 'operator' not in image_metadata:
+        Logger.warning(f"{file_obj.name}: missing 'operator' field in images.meta")
+    if 'version' not in image_metadata:
+        Logger.warning(f"{file_obj.name}: missing 'version' field in images.meta")
+
     registry = 'docker.io'
     if 'registry' in image_metadata:
         registry = image_metadata['registry'].get('default', 'docker.io')
@@ -333,44 +339,130 @@ def images(request, gpu_cluster, environment):
     return image_info
 
 @pytest.fixture(scope="session")
-def alternative_images(request, gpu_cluster, environment):
-    image_info = None
+def all_image_versions(request, environment):
+    """
+    Load all released operator image manifests from image-manifest/ directory.
+
+    Scans tests/pytests/image-manifest/{operator}/ subdirectories
+    and loads all *_external_images.yaml files.
+
+    Returns:
+        dict[str, dict[str, dict]]: Nested dictionary structure
+        {
+            "gpu-operator": {
+                "v1.4.1": {image_info_dict},
+                "v1.4.0": {image_info_dict},
+                ...
+            },
+            "network-operator": {
+                "v1.0.0": {image_info_dict},
+                ...
+            }
+        }
+
+    Validation:
+        - Operator from directory name should match images.meta.operator
+        - Version from filename should match images.meta.version
+        - Warns on mismatch but doesn't fail (allows gradual migration)
+    """
+    global Logger
     from ruamel.yaml import YAML
-    from ruamel.yaml import comments
-    from ruamel.yaml import scalarstring
-    import shutil
 
     yaml = YAML()
     yaml.preserve_quotes = True
 
-    if not request.config.option.alternative_image_manifest:
-        pytest.skip("No alterative image-manifest given. Skipping associated testcases")
+    manifest_base_dir = Path(__file__).parent / "image-manifest"
+    version_map = {}
 
-    file_obj = Path(request.config.option.alternative_image_manifest)
-    if not file_obj.exists():
-        pytest.fail("Missing alterative image-manifest")
+    if not manifest_base_dir.exists():
+        Logger.warning(f"Image manifest directory not found: {manifest_base_dir}")
+        return version_map
 
-    image_manifest = dict(yaml.load(file_obj))
+    # Iterate through operator subdirectories
+    for operator_dir in manifest_base_dir.iterdir():
+        if not operator_dir.is_dir():
+            continue
 
-    # Process metadata section of image-manifest
-    image_metadata = image_manifest['images'].get('meta', {})
-    registry = 'docker.io'
-    if 'registry' in image_metadata:
-        registry = image_metadata['registry'].get('default', 'docker.io')
-        if 'mirror' in image_metadata['registry']:
-            if image_metadata['registry']['mirror'].get('enable', 'no') == 'yes':
-                registry = image_metadata['registry']['mirror']['url']
-    assert environment.deployment_mode in image_manifest['images'], f"Missing images for {environment.deployment_mode}"
-    if environment.deployment_mode == "standalone":
-        image_info = _build_image_info(environment, image_manifest['images'])
+        operator_type = operator_dir.name  # "gpu-operator" or "network-operator"
+        version_map[operator_type] = {}
 
-    if environment.deployment_mode in ["k8", "openshift"]:
-        image_info = _build_image_info(environment, image_manifest['images'])
+        # Load all *_external_images.yaml files in this operator directory
+        for manifest_file in sorted(operator_dir.glob("*_external_images.yaml")):
+            try:
+                # Extract version from filename: v1.4.1_external_images.yaml -> v1.4.1
+                filename_version = manifest_file.stem.replace("_external_images", "")
 
-    assert image_info != None, f"Failed to build images for {environment.deployment_mode}"
-    gpu_cluster.k8_registry = environment.default_registry
-    image_info['driver.imageBuild.baseImageRegistry'] = environment.default_registry
-    setattr(pytest, "_alternative_image_info", image_info)
+                # Load manifest
+                manifest_data = yaml.load(manifest_file)
+
+                if not manifest_data or 'images' not in manifest_data:
+                    Logger.warning(f"{manifest_file}: Invalid manifest structure")
+                    continue
+
+                # Validate metadata (optional - warn on mismatch)
+                if 'meta' in manifest_data['images']:
+                    meta = manifest_data['images']['meta']
+
+                    # Check operator field
+                    if 'operator' in meta:
+                        if meta['operator'] != operator_type:
+                            Logger.warning(
+                                f"{manifest_file.name}: metadata operator '{meta['operator']}' "
+                                f"doesn't match directory '{operator_type}'"
+                            )
+                    else:
+                        Logger.debug(f"{manifest_file.name}: missing 'operator' field in metadata")
+
+                    # Check version field
+                    if 'version' in meta:
+                        if meta['version'] != filename_version:
+                            Logger.warning(
+                                f"{manifest_file.name}: metadata version '{meta['version']}' "
+                                f"doesn't match filename '{filename_version}'"
+                            )
+                    else:
+                        Logger.debug(f"{manifest_file.name}: missing 'version' field in metadata")
+                else:
+                    Logger.debug(f"{manifest_file.name}: missing 'meta' section")
+
+                # Build image_info WITHOUT mutating environment
+                # (to avoid overwriting RC version with released version)
+                image_info = _build_image_info_no_env_mutation(environment, manifest_data['images'])
+
+                # Store in nested dict
+                version_map[operator_type][filename_version] = image_info
+
+                Logger.debug(f"Loaded {operator_type} {filename_version} from {manifest_file.name}")
+
+            except Exception as e:
+                Logger.error(f"Failed to load {manifest_file.name}: {e}")
+                continue
+
+    # Log summary
+    for op_type, versions in version_map.items():
+        if versions:
+            Logger.info(f"Loaded {len(versions)} version(s) for {op_type}: {sorted(versions.keys())}")
+
+    return version_map
+
+def _build_image_info_no_env_mutation(environment, image_manifest):
+    '''
+    Build image-info WITHOUT mutating environment object.
+    Used by all_image_versions to avoid overwriting RC version with released versions.
+    '''
+    # Temporarily save current environment versions
+    saved_gpu_op_ver = getattr(environment, 'gpu_operator_version', None)
+    saved_exporter_ver = getattr(environment, 'exporter_version', None)
+
+    # Call the regular helper
+    image_info = _build_image_info(environment, image_manifest)
+
+    # Restore original environment versions
+    if saved_gpu_op_ver is not None:
+        setattr(environment, 'gpu_operator_version', saved_gpu_op_ver)
+    if saved_exporter_ver is not None:
+        setattr(environment, 'exporter_version', saved_exporter_ver)
+
     return image_info
 
 def _build_image_info(environment, image_manifest):
@@ -537,6 +629,10 @@ def pytest_runtest_setup(item):
     yield
 
 def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "upgrade: mark test as operator/operand upgrade test"
+    )
+
     """
     Add custom CSS styling to the HTML report for better aesthetics.
     Writes CSS to a temporary file and registers it with pytest-html.

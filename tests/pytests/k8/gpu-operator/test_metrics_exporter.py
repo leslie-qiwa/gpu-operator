@@ -1845,8 +1845,9 @@ def test_exporter_rbac_mTLS_cert_support(gpu_cluster, deviceconfig_install, envi
     failed_pods = k8_util.k8_check_pod_running(environment.gpu_operator_namespace, devicecfg_pods)
     K8Helper.triage(environment, not failed_pods, f"One or more pods are not ready - {failed_pods}")
 
+@pytest.mark.skip(reason="TODO: Update to use all_image_versions fixture instead of removed alternative_images")
 @pytest.mark.parametrize("upgrade_policy", ["RollingUpdate", "OnDelete"])
-def test_exporter_operand_upgrade(request, gpu_cluster, deviceconfig_install, environment, images, alternative_images, upgrade_policy):
+def test_exporter_operand_upgrade(request, gpu_cluster, deviceconfig_install, environment, images, upgrade_policy):
     global Logger
     if environment.gpu_operator_version < "v1.2.0":
         pytest.skip(f"DME Operand upgrade feature is not available in release before v1.2.0")

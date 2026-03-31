@@ -1,110 +1,111 @@
----
 
 images:
-    meta:
-        registry:
-            default: docker.io
-            mirror:
-                enable: yes
-                url: registry.test.pensando.io:5000
-        packaging:
-          gpuctl : disabled
-    k8:
-        driver:
-          key           : driver.image
-          kind          : container
+  meta:
+    registry:
+      default: docker.io
+      mirror:
+        enable: yes
+        url: registry.test.pensando.io:5000
+    packaging:
+      gpuctl: disabled
+    operator: gpu-operator
+    version: seed
+  k8:
+    driver:
+      key: driver.image
+      kind: container
 
-        gpu-operator:
-            image       : file://sandbox/gpu-operator/gpu-operator-helm-k8s.tgz
-            kind        : helm-chart
-            version     : v1.5.0
+    gpu-operator:
+      image: file://sandbox/gpu-operator/gpu-operator-helm-k8s.tgz
+      kind: helm-chart
+      version: v1.5.0
 
-        gpu-controller-manager:
-            key         : controllerManager.manager.image
-            image       : file://sandbox/gpu-operator/gpu-operator.tar.gz
-            kind        : container
+    gpu-controller-manager:
+      key: controllerManager.manager.image
+      image: file://sandbox/gpu-operator/gpu-operator.tar.gz
+      kind: container
 
-        exporter:
-            image       : file://sandbox/device-metrics-exporter/helm-charts/device-metrics-exporter-charts.tgz
-            metadata    : file://sandbox/device-metrics-exporter/helm-charts/device-metrics-exporter-charts.metadata
-            kind        : helm-chart
-            version     : v1.4.1
+    exporter:
+      image: file://sandbox/device-metrics-exporter/helm-charts/device-metrics-exporter-charts.tgz
+      metadata: file://sandbox/device-metrics-exporter/helm-charts/device-metrics-exporter-charts.metadata
+      kind: helm-chart
+      version: v1.4.1
 
-        device-metrics-exporter:
-            key         : metricsExporter.image
-            image       : file://sandbox/device-metrics-exporter/docker/device-metrics-exporter-latest.tar.gz
-            metadata    : file://sandbox/device-metrics-exporter/docker/device-metrics-exporter-latest.metadata
-            kind        : container
+    device-metrics-exporter:
+      key: metricsExporter.image
+      image: file://sandbox/device-metrics-exporter/docker/device-metrics-exporter-latest.tar.gz
+      metadata: file://sandbox/device-metrics-exporter/docker/device-metrics-exporter-latest.metadata
+      kind: container
 
-        test-runner:
-            key         : testRunner.image
-            image       : file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest.tar.gz
-            metadata    : file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest.metadata
-            kind        : container
+    test-runner:
+      key: testRunner.image
+      image: file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest.tar.gz
+      metadata: file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest.metadata
+      kind: container
 
-        test-runner-agfhc:
-            key         : testRunnerAgfhc.image
-            image       : file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest-agfhc.tar.gz
-            metadata    : file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest-agfhc.metadata
-            kind        : container
+    test-runner-agfhc:
+      key: testRunnerAgfhc.image
+      image: file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest-agfhc.tar.gz
+      metadata: file://sandbox/device-metrics-exporter/docker/testrunner/test-runner-latest-agfhc.metadata
+      kind: container
 
-        config-manager:
-            key         : configManager.image
-            image       : file://sandbox/device-config-manager/docker/obj/device-config-manager.tgz
-            metadata    : file://sandbox/device-config-manager/docker/obj/device-config-manager.metadata
-            kind        : container
+    config-manager:
+      key: configManager.image
+      image: file://sandbox/device-config-manager/docker/obj/device-config-manager.tgz
+      metadata: file://sandbox/device-config-manager/docker/obj/device-config-manager.metadata
+      kind: container
 
-        device-plugin:
-            key         : devicePlugin.devicePluginImage
-            location    : container://<registry>/rocm/k8s-device-plugin
-            version     : latest
-            kind        : container
+    device-plugin:
+      key: devicePlugin.devicePluginImage
+      location: container://<registry>/rocm/k8s-device-plugin
+      version: latest
+      kind: container
 
-        node-labeller:
-            key         : devicePlugin.nodeLabellerImage
-            location    : container://<registry>/rocm/k8s-device-plugin
-            version     : labeller-latest
-            kind        : container
+    node-labeller:
+      key: devicePlugin.nodeLabellerImage
+      location: container://<registry>/rocm/k8s-device-plugin
+      version: labeller-latest
+      kind: container
 
-        kmm-controller-manager-image-sign:
-            key         : kmm.controller.manager.env.relatedImageSign
-            image       : file://sandbox/kernel-module-management/kernel-module-management-signimage.tar.gz
-            metadata    : file://sandbox/kernel-module-management/kernel-module-management-signimage.metadata
-            kind        : container
+    kmm-controller-manager-image-sign:
+      key: kmm.controller.manager.env.relatedImageSign
+      image: file://sandbox/kernel-module-management/kernel-module-management-signimage.tar.gz
+      metadata: file://sandbox/kernel-module-management/kernel-module-management-signimage.metadata
+      kind: container
 
-        kmm-controller-manager-worker:
-            key         : kmm.controller.manager.env.relatedImageWorker
-            image       : file://sandbox/kernel-module-management/kernel-module-management-worker.tar.gz
-            metadata    : file://sandbox/kernel-module-management/kernel-module-management-worker.metadata
-            kind        : container
+    kmm-controller-manager-worker:
+      key: kmm.controller.manager.env.relatedImageWorker
+      image: file://sandbox/kernel-module-management/kernel-module-management-worker.tar.gz
+      metadata: file://sandbox/kernel-module-management/kernel-module-management-worker.metadata
+      kind: container
 
-        kmm-controller-manager:
-            key         : kmm.controller.manager.image
-            image       : file://sandbox/kernel-module-management/kernel-module-management-operator.tar.gz
-            metadata    : file://sandbox/kernel-module-management/kernel-module-management-operator.metadata
-            kind        : container
+    kmm-controller-manager:
+      key: kmm.controller.manager.image
+      image: file://sandbox/kernel-module-management/kernel-module-management-operator.tar.gz
+      metadata: file://sandbox/kernel-module-management/kernel-module-management-operator.metadata
+      kind: container
 
-        kmm-webhook-server:
-            key         : kmm.webhookServer.webhookServer.image
-            image       : file://sandbox/kernel-module-management/kernel-module-management-webhook-server.tar.gz
-            metadata    : file://sandbox/kernel-module-management/kernel-module-management-webhook-server.metadata
-            kind        : container
+    kmm-webhook-server:
+      key: kmm.webhookServer.webhookServer.image
+      image: file://sandbox/kernel-module-management/kernel-module-management-webhook-server.tar.gz
+      metadata: file://sandbox/kernel-module-management/kernel-module-management-webhook-server.metadata
+      kind: container
 
-        init-container-image:
-            key         : commonConfig.initContainerImage
-            location    : container://<registry>/busybox
-            version     : 1.36
-            kind        : container
+    init-container-image:
+      key: commonConfig.initContainerImage
+      location: container://<registry>/busybox
+      version: 1.36
+      kind: container
 
-        tensorflow-image:
-            key         : workload.tensorflow
-            location    : container://registry.test.pensando.io:5000/rocm/tensorflow
-            version     : latest
-            kind        : container
+    tensorflow-image:
+      key: workload.tensorflow
+      location: container://registry.test.pensando.io:5000/rocm/tensorflow
+      version: latest
+      kind: container
 
-        pytorch-image:
-            key         : workload.pytorch
-            location    : container://docker.io/rocm/pytorch
-            version     : latest
-            kind        : container
+    pytorch-image:
+      key: workload.pytorch
+      location: container://docker.io/rocm/pytorch
+      version: latest
+      kind: container
 

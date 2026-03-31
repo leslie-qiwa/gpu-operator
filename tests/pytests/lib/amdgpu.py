@@ -59,3 +59,24 @@ def get_amdgpu_device_series(device_id) -> str:
         if dev_id_str in entry.get("device-id", []):
             return entry.get("series", "UNKNOWN")
     return "UNKNOWN"
+
+def get_supported_operands(gpu_op_version: str):
+    """
+    Look up gpu_op_version in the lib/files/gpu-operator-operands-support.json
+    and retrieve supported operands
+    """
+
+    # Use absolute path relative to this module
+    module_dir = os.path.dirname(os.path.abspath(__file__))
+    json_file = os.path.join(module_dir, "files", "gpu-operator-operands-support.json")
+
+    try:
+        with open(json_file, "r") as fp:
+            gpu_op_release_info = json.load(fp)
+    except FileNotFoundError:
+        return None
+    except json.JSONDecodeError:
+        return None
+
+    match = next((item for item in gpu_op_release_info.get("release-matrix", []) if item["gpu-operator"] == gpu_op_version), None)
+    return match

@@ -163,6 +163,67 @@ def helm_install(k8_cluster : common.k8_cluster, release_name : str, namespace :
     return cmd_resp.returncode, cmd_resp.stdout, cmd_resp.stderr
 
 @log_arguments
+def helm_upgrade(k8_cluster : common.k8_cluster, release_name : str, namespace : str, helm_chart_path : str, version : str, values_yaml : str, **kwargs) -> (int, str, str):
+    """
+    API to upgrade helm-chart
+
+    For example, following command will be run:
+    helm upgrade <release-name> <path-to-helm-chart>
+        -n kube-amd-gpu --version=<version>
+        --set controllerManager.manager.image.repository=registry.test.pensando.io:5000/amd-gpu-operator
+        --set controllerManager.manager.image.tag=latest
+
+    Parameters:
+    k8_cluster : instance of lib.common.k8_cluster
+    release_name : release-name of the helm-chart to upgrade
+    namespace : namespace in which helm-chart is installed
+    helm_chart_path : path to helm chart (file or repo path)
+    version : version of the helm-chart to upgrade to
+    values_yaml : values.yaml file
+
+    Returns:
+    ret_code   : Return code for command execution. 0 for success else failure
+    ret_stdout : Stdout from command execution
+    ret_stderr : Stderr from command execution
+    """
+
+    global Logger
+    cmd = ["helm", "upgrade", "--debug", f"{release_name}", f"{helm_chart_path}"]
+    cmd.extend(["-n", f"{namespace}"])
+    if version:
+        cmd.extend([f"--version={version}"])
+
+    for key, value in kwargs.items():
+        cmd.extend(["--set", f"{key}={value}"])
+
+    if release_name == 'gpu-operator':
+        if os.getenv("GPU_DEVICE") == "VF":
+            node_selection = {
+                "feature.node.kubernetes.io/amd-gpu"    : None,
+                "feature.node.kubernetes.io/amd-vgpu"   : "true",
+            }
+        else:
+            node_selection = {
+                "feature.node.kubernetes.io/amd-gpu"    : "true",
+                "feature.node.kubernetes.io/amd-vgpu"   : None,
+            }
+        cmd.extend(["--set-json", f"deviceConfig.spec.selector={json.dumps(node_selection)}"])
+
+    if k8_cluster.k8_kube_config:
+        cmd.extend(["--kubeconfig", k8_cluster.k8_kube_config])
+
+    if values_yaml:
+        if not os.path.exists(values_yaml):
+            return -1, "", f"Missing values.yaml : {values_yaml}"
+        cmd.extend(["-f", values_yaml])
+    Logger.debug(f"helm-upgrade command: {' '.join(cmd)}")
+    cmd_resp = subprocess.run(cmd, check=False,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              encoding='utf-8')
+    return cmd_resp.returncode, cmd_resp.stdout, cmd_resp.stderr
+
+@log_arguments
 def helm_uninstall(k8_cluster : common.k8_cluster, release_name : str, namespace : str) -> (int, str, str):
     """
     API to uninstall helm-chart

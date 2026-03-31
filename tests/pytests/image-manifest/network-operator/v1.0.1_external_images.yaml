@@ -1,0 +1,15 @@
+---
+# AMD Network-Operator v1.0.1 - Placeholder Manifest
+# Reference: https://instinct.docs.amd.com/projects/network-operator/en/main/index.html
+
+images:
+  meta:
+    operator: network-operator
+    version: v1.0.1
+    registry:
+      default: docker.io
+
+  k8:
+    # TODO: Populate with actual network-operator components
+    # This is a placeholder to establish the structure
+    # Real components will be added when network-operator releases become available
