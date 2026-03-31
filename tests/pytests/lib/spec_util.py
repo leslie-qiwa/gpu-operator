@@ -968,6 +968,10 @@ def generate_k8_deviceconfig_cr(gpu_operator_version, spec = {}, skip_sections =
                 device_config['spec']['remediationWorkflow']['config'] = {
                     'name' : spec.get('remediationWorkflow.config', None),
                     }
+            if spec.get("remediationWorkflow.nodeRemediationLabels", None) is not None:
+                device_config["spec"]["remediationWorkflow"]["nodeRemediationLabels"] = spec.get("remediationWorkflow.nodeRemediationLabels")
+            if spec.get("remediationWorkflow.maxParallelWorkflows", None) is not None:
+                device_config["spec"]["remediationWorkflow"]["maxParallelWorkflows"] = spec.get("remediationWorkflow.maxParallelWorkflows")
             if spec.get('remediationWorkflow.testerImage.repository', None) and spec.get('remediationWorkflow.testerImage.version', None):
                 img = f"{spec.get('remediationWorkflow.testerImage.repository')}:{spec.get('remediationWorkflow.testerImage.version')}"
                 device_config['spec']['remediationWorkflow']['testerImage'] = img      
