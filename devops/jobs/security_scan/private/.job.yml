@@ -1,0 +1,16 @@
+---
+version: 2.0
+image:
+  bind_dir: "/gpu-operator"
+  work_dir: "/gpu-operator/devops/jobs/security_scan/private"
+targets:
+  security_scan_private:
+    commands: ["sh", "../trigger.sh", "gpu-operator", "1.5.0-345", "main"]
+    owners: ["email:karan.nath@amd.com"]
+    area:
+    sub-area:
+    feature:
+    asset-dependencies:
+      tags: []
+logfiles:
+submodules: {}

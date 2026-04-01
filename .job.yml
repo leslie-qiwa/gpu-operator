@@ -295,6 +295,8 @@ jobs:
     labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.34"]
   tests/jobs/k8s-compat/1.35.2:
     labels: ["CI-Pytest-K8-Compat", "CI-Pytest-K8-Compat-1.35"]
+  devops/jobs/security_scan/sanity:
+    labels: ["CI-Sanity-Build"]
 host_mounts:
   "/sys/module": "/sys/module"
   "/lib/modules": "/lib/modules"

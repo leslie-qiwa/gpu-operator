@@ -1,0 +1,17 @@
+---
+version: 2.0
+image:
+  bind_dir: "/gpu-operator"
+  work_dir: "/gpu-operator/devops/jobs/security_scan/sanity"
+targets:
+  security_scan_sanity:
+    commands: ["sh", "../trigger.sh", "gpu-operator", "${RELEASE}", "${JOB_BASE_BRANCH}"]
+    owners: ["email:karan.nath@amd.com"]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+    feature:
+    asset-dependencies:
+      tags: []
+logfiles:

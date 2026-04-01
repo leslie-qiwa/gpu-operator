@@ -1,0 +1,6 @@
+# Security scan configuration
+tool: trivy
+scan_type: artifact
+artifacts:
+  - gpu-operator-<RELEASE_TAG>.tar.gz
+  - gpu-operator-utils-<RELEASE_TAG>.tar.gz
