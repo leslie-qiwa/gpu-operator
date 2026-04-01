@@ -5,6 +5,7 @@ This directory contains pytest-based test suites for validating the AMD GPU DRA 
 ## Overview
 
 The DRA driver test suite validates:
+
 - DRA driver installation via Helm chart
 - Device discovery and advertisement
 - GPU attributes and metadata
@@ -182,12 +183,14 @@ The DRA driver tests are integrated with jobd CI system via:
 **Job**: `dra-driver-pytest-sanity` (in `tests/jobs/sanity/.job.yml`)
 
 **Command**:
+
 ```bash
 /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app dra-driver \
   --testbed /warmd.json --amdgpu-driver default-deviceconfig
 ```
 
 **Build Dependencies**:
+
 - `build-gpu-operator`
 - `build-gpu-operator-k8s`
 - `build-external-kernel-module-manager`
@@ -196,6 +199,7 @@ The DRA driver tests are integrated with jobd CI system via:
 - `build-external-kernel-module-worker`
 
 **Test Execution Flow**:
+
 1. GPU operator installed
 2. AMDGPU driver loaded via DeviceConfig
 3. DRA driver Helm chart deployed
@@ -203,7 +207,7 @@ The DRA driver tests are integrated with jobd CI system via:
 
 ## Fixture Dependency Chain
 
-```
+```text
 Session Setup:
   init_dra_testbed
     ↓
