@@ -72,6 +72,11 @@ images:
       version     : 5a66d18e
       kind        : container
 
+    dra-driver:
+      location    : http://pm.test.pensando.io/systest/k8s-gpu-dra-driver-helm-k8s-v0.1.0.tgz
+      kind        : helm-chart
+      version     : v0.1.0
+
     node-labeller:
       key: devicePlugin.nodeLabellerImage
       location: container://<registry>/rocm/k8s-device-plugin
@@ -242,6 +247,11 @@ images:
       location    : container://registry.test.pensando.io:5000/k8s-gpu-dra-driver
       version     : 5a66d18e
       kind        : container
+
+    dra-driver:
+      location    : http://pm.test.pensando.io/systest/k8s-gpu-dra-driver-helm-k8s-v0.1.0.tgz
+      kind        : helm-chart
+      version     : v0.1.0
 
     node-labeller:
       key: devicePlugin.nodeLabellerImage

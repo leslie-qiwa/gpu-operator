@@ -177,11 +177,92 @@ def init_dra_testbed(
 
 
 @pytest.fixture(scope="module")
+def amdgpu_driver_install(gpu_cluster, images, gpu_operator_install, environment):
+    """
+    Install AMD GPU driver using DeviceConfig CR.
+
+    This fixture depends on gpu_operator_install to ensure GPU operator
+    is deployed before creating the DeviceConfig CR to load the driver.
+
+    Similar to exporter tests - creates a minimal DeviceConfig with only
+    the driver enabled (no device plugin, no exporter).
+    """
+    global Logger
+    import lib.spec_util as spec_util
+    from lib.util import K8Helper
+    import time
+
+    # gpu_operator_install is a dependency - GPU operator is already installed
+    Logger.info("GPU operator is installed (via gpu_operator_install dependency)")
+
+    # Cleanup any existing DeviceConfig CRs
+    devcfg_map = k8_util.k8_get_deviceconfigs_info(environment.gpu_operator_namespace)
+    for devcfg_name, _ in devcfg_map.items():
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_deviceconfig_cr(
+            environment.gpu_operator_namespace, devcfg_name
+        )
+        if ret_code != 0:
+            Logger.error(f"Failed to delete deviceconfig {devcfg_name}: {ret_stderr}")
+    time.sleep(10)
+
+    # Skip driver install if using inbox driver
+    if environment.amdgpu_driver_spec["driver-deployment"] == "inbox":
+        Logger.info("Using inbox driver - no DeviceConfig needed")
+        yield
+        return
+
+    # Get GPU nodes
+    ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
+    K8Helper.triage(environment, (ret_code == 0), "Error getting GPU nodes from cluster")
+    K8Helper.triage(environment, (len(gpu_nodes) > 0), "No AMD GPU nodes found in cluster")
+
+    # Create DeviceConfig CR to install AMDGPU driver
+    # Enable only driver, disable device-plugin and exporter
+    test_config = {
+        'metadata.namespace': environment.gpu_operator_namespace,
+        'driver.enable': True,
+        'devicePlugin.enableNodeLabeller': False,
+        'metricsExporter.enable': False,
+    }
+    test_config.update(images)
+
+    test_cfg_map = spec_util.build_deviceconfig_cr_template(
+        test_config, gpu_nodes, 'dra-driver', environment.amdgpu_driver_spec
+    )
+    devicecfg_list = []
+    for spec_name, tcfg in test_cfg_map.items():
+        cr_spec = spec_util.generate_k8_deviceconfig_cr(environment.gpu_operator_version, tcfg)
+        ret_code, ret_stdout, ret_stderr = k8_util.k8_create_deviceconfig_cr(cr_spec)
+        K8Helper.triage(environment, (ret_code == 0), f"Failed to create DeviceConfig: {ret_stderr}")
+        devicecfg_list.append(tcfg['metadata.name'])
+
+    # Wait for DeviceConfig to be ready and driver to load
+    K8Helper.check_deviceconfig_status(environment, devicecfg_list)
+    for devcfg in devicecfg_list:
+        K8Helper.wait_kmm_worker_completion(environment, devcfg)
+    K8Helper.update_node_driver_version(gpu_cluster, environment)
+
+    Logger.info(f"AMDGPU driver installed successfully via DeviceConfig: {devicecfg_list}")
+
+    yield
+
+    # Cleanup DeviceConfig CRs after test module completes
+    Logger.info("Cleaning up DeviceConfig CRs")
+    device_cfg_info = k8_util.k8_get_deviceconfigs_info(environment.gpu_operator_namespace, None)
+    for devcfg_name, _ in device_cfg_info.items():
+        k8_util.k8_delete_deviceconfig_cr(environment.gpu_operator_namespace, devcfg_name)
+    return
+
+
+@pytest.fixture(scope="module")
 def dra_driver_install(
-    gpu_cluster, dra_driver_release_name, dra_driver_namespace, images, environment, dra_api_version
+    gpu_cluster, dra_driver_release_name, dra_driver_namespace, images, environment, dra_api_version, amdgpu_driver_install
 ):
     """Install DRA driver using Helm chart"""
     global Logger
+
+    # amdgpu_driver_install is a dependency - GPU operator and driver are already installed
+    Logger.info("GPU operator and AMDGPU driver are installed (via amdgpu_driver_install dependency)")
 
     # Use cached DRA API version from session fixture
     Logger.info(f"Using DRA API version: {dra_api_version}")
@@ -263,7 +344,7 @@ def dra_driver_install(
     # The image key is based on the 'key' field in the YAML, not the artifact name
     if images.get("image.repository.repository") or images.get(
         "dra-driver-image.repository"
-    ):
+    ) or images.get("draDriver.image.repository"):
         values_yaml = os.path.join(
             environment.logdir, f"dra_driver_values_{dra_version}.yaml"
         )

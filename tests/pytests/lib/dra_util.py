@@ -700,15 +700,18 @@ def generate_dra_driver_values(images: Dict, output_file: str) -> bool:
     # Add image configuration
     # The key structure in images dict is based on the 'key' field in YAML
     # For dra-driver-image with key 'image.repository', it becomes 'image.repository.repository'
+    # For dra-driver-image with key 'draDriver.image', it becomes 'draDriver.image.repository'
     image_repo = (
         images.get("image.repository.repository")
         or images.get("dra-driver-image.repository")
         or images.get("dra-driver.image.repository")
+        or images.get("draDriver.image.repository")  # Support camelCase key from manifest
     )
     image_tag = (
         images.get("image.repository.version")
         or images.get("dra-driver-image.version")
-        or images.get("dra-driver.image.version", "latest")
+        or images.get("dra-driver.image.version")
+        or images.get("draDriver.image.version", "latest")  # Support camelCase key from manifest
     )
 
     if image_repo:
@@ -723,6 +726,7 @@ def generate_dra_driver_values(images: Dict, output_file: str) -> bool:
         images.get("image.repository.secret")
         or images.get("dra-driver-image.secret")
         or images.get("dra-driver.image.secret")
+        or images.get("draDriver.image.secret")  # Support camelCase key from manifest
     )
     if image_secret:
         values["imagePullSecrets"] = [{"name": image_secret}]

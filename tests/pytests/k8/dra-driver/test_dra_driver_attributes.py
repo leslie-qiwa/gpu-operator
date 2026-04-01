@@ -852,10 +852,38 @@ def validate_pcie_root_attribute(device_name, pci_addr, gpu_attrs, environment):
 
 
 def test_dra_driver_device_attributes(dra_driver_install, environment):
-    """Test that DRA driver advertises all required device attributes
+    """Test that DRA driver advertises all required device attributes.
 
-    Validates attributes documented in:
-    https://github.com/ROCm/k8s-gpu-dra-driver/blob/main/docs/driver-attributes.md
+    This test validates that the DRA driver correctly advertises all required
+    device attributes for AMD GPUs via ResourceSlices. It checks both the
+    presence and validity of each attribute.
+
+    Validates:
+        - ResourceSlices are created and populated (waits up to 60 seconds)
+        - Each GPU device has all required attributes:
+            * type: Device type (e.g., "amdgpu")
+            * pciAddr: PCI address (format: 0000:06:00.0 or 06:00.0)
+            * drmCardIndex: DRM card index (integer >= 0)
+            * numCUs: Number of compute units (integer > 0)
+            * numSIMDs: Number of SIMD units (integer > 0)
+            * devName: Device name/codename (non-empty string)
+            * uuid: Unique device identifier (non-empty string)
+            * vram: VRAM size in bytes (integer > 0)
+        - Attribute values are valid (correct types, reasonable ranges)
+        - Partition attributes if device is partitioned
+
+    Fixtures:
+        dra_driver_install: Ensures DRA driver is installed and running
+
+    kubectl equivalents:
+        kubectl get resourceslices.resource.k8s.io
+        kubectl get resourceslices -o yaml
+
+    Expected outcome:
+        All GPU devices have complete and valid attribute sets
+
+    Reference:
+        https://github.com/ROCm/k8s-gpu-dra-driver/blob/main/docs/driver-attributes.md
     """
     global Logger
 
@@ -936,7 +964,40 @@ def test_dra_driver_device_attributes(dra_driver_install, environment):
 def test_dra_gpu_count_matches_hardware(
     dra_driver_install, environment, gpu_hardware_info
 ):
-    """Test that DRA advertises the same number of GPUs as detected by hardware"""
+    """Test that DRA advertises the same number of GPUs as detected by hardware.
+
+    This test validates that the GPU count advertised by the DRA driver matches
+    the actual number of GPUs detected on each node via hardware inspection
+    (lspci and sysfs). This is a basic sanity check before detailed attribute
+    validation.
+
+    Validates:
+        - DRA advertised GPU count matches hardware detected count
+        - Count check performed per-node (all GPU nodes validated)
+        - Only "amdgpu" type devices counted (partitions excluded)
+        - Reports specific node if mismatch found
+
+    Fixtures:
+        dra_driver_install: Ensures DRA driver is installed
+        gpu_hardware_info: Cached hardware info for all GPU nodes
+
+    Hardware Detection Method:
+        - Spawns privileged debug pod on each GPU node
+        - Runs lspci to detect AMD GPUs
+        - Reads /sys/class/drm to enumerate devices
+        - Collects data once per test module (shared fixture)
+
+    kubectl equivalents:
+        kubectl get resourceslices -o yaml
+        # Hardware detection uses privileged pod with lspci and sysfs
+
+    Expected outcome:
+        DRA count == Hardware count for all GPU nodes
+
+    Notes:
+        If this test fails but test_dra_devices_match_hardware passes,
+        it may indicate a filtering or type classification issue.
+    """
     global Logger
 
     # Check each GPU node using cached hardware info
@@ -1208,10 +1269,56 @@ def validate_partition_profile_from_hardware(
 
 
 def test_dra_devices_match_hardware(dra_driver_install, environment, gpu_hardware_info):
-    """Test that DRA advertised GPU attributes match hardware per PCI address
+    """Test that DRA advertised GPU attributes match hardware per PCI address.
 
-    Enhanced validation that compares each GPU individually using PCI address as key.
-    This provides better debugging - identifies exactly which GPU has mismatched data.
+    This is the most comprehensive validation test. It performs deep attribute
+    comparison for each GPU individually, using PCI address as the correlation
+    key. This provides precise debugging - identifies exactly which GPU and
+    which attribute has mismatched data.
+
+    Validates (per GPU, correlated by PCI address):
+        - pciAddr: DRA matches hardware PCI address (normalized to long format)
+        - drmCardIndex: DRA matches hardware DRM card index
+        - numCUs: DRA matches hardware compute units count
+        - devName: DRA matches hardware device name/codename
+        - uuid: DRA matches hardware GPU UUID
+        - vram: DRA matches hardware VRAM size (bytes)
+        - Partition attributes (if GPU is partitioned):
+            * partitionProfile: Matches compute_memory partition format
+            * partitionIndex: Valid partition index
+            * parentPciAddr: References parent GPU PCI address
+
+    Fixtures:
+        dra_driver_install: Ensures DRA driver is installed
+        gpu_hardware_info: Cached hardware info for all GPU nodes
+
+    Hardware Detection Method:
+        - Reads /sys/class/drm/card*/device/* for GPU attributes
+        - Uses lspci for PCI address validation
+        - Collects partition info from sysfs
+        - Data collected once per module (shared fixture)
+
+    Correlation Method:
+        1. Build hardware GPU map by PCI address (normalized)
+        2. For each DRA device, find matching hardware GPU by PCI
+        3. Compare all attributes individually
+        4. Report any mismatches with details
+
+    kubectl equivalents:
+        kubectl get resourceslices -o yaml
+        # Hardware: privileged pod reading /sys/class/drm and lspci
+
+    Expected outcome:
+        All DRA GPU attributes match corresponding hardware values
+
+    Error Reporting:
+        - Lists all mismatches with node, PCI address, attribute name
+        - Shows expected (hardware) vs actual (DRA) values
+        - Reports missing GPUs (in hardware but not in DRA or vice versa)
+
+    Notes:
+        This test is most useful for debugging attribute issues. If it fails,
+        check the detailed mismatch report to identify the specific problem.
     """
     global Logger
 

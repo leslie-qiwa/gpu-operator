@@ -201,7 +201,29 @@ def test_dra_driver_install(
     dra_driver_install,
     environment,
 ):
-    """Test DRA driver installation via Helm chart"""
+    """Test DRA driver installation via Helm chart.
+
+    This test validates that the DRA driver has been successfully installed
+    and is running correctly in the cluster.
+
+    Validates:
+        - Helm release is deployed with status "deployed"
+        - DRA driver namespace exists
+        - DRA driver pods are running
+        - No critical errors in pod logs
+
+    Fixtures:
+        dra_driver_install: Installs DRA driver before test runs
+
+    kubectl equivalents:
+        helm list -n <namespace>
+        kubectl get namespaces
+        kubectl get pods -n <namespace>
+        kubectl logs <pod-name> -n <namespace>
+
+    Expected outcome:
+        DRA driver is fully installed and operational
+    """
     global Logger
 
     # Verify Helm release is deployed
@@ -260,7 +282,25 @@ def test_dra_driver_install(
 
 
 def test_dra_driver_gpu_node_labels(dra_driver_install, environment):
-    """Test that GPU nodes have appropriate labels for DRA"""
+    """Test that GPU nodes have appropriate labels for DRA.
+
+    This test validates that nodes with AMD GPUs have been properly labeled
+    with the required feature labels for DRA resource discovery.
+
+    Validates:
+        - All GPU nodes have 'feature.node.kubernetes.io/amd-gpu=true' label
+        - Label is present and set to correct value
+
+    Fixtures:
+        dra_driver_install: Ensures DRA driver is installed
+
+    kubectl equivalents:
+        kubectl get nodes -l feature.node.kubernetes.io/amd-gpu=true
+        kubectl get nodes -o jsonpath='{.items[*].metadata.labels}'
+
+    Expected outcome:
+        All GPU nodes have AMD GPU feature label
+    """
     global Logger
 
     # kubectl equivalent: kubectl get nodes -l feature.node.kubernetes.io/amd-gpu=true
@@ -291,13 +331,46 @@ def test_dra_driver_uninstall(
     dra_driver_release_name,
     dra_driver_namespace,
     dra_driver_install,
+    images,
     environment,
 ):
-    """Test DRA driver uninstallation and cleanup
-    
-    This test performs actual uninstallation and should be run:
-    - As part of the full test suite (for complete cleanup)
-    - Explicitly when you want to cleanup after manual testing
+    """Test DRA driver uninstallation and cleanup.
+
+    This test validates that the DRA driver can be cleanly uninstalled and
+    all resources are properly cleaned up. After validation, it reinstalls
+    the DRA driver to maintain test isolation.
+
+    Test Flow:
+        1. Verify DRA driver is installed
+        2. Uninstall DRA driver via Helm
+        3. Verify all pods are terminated
+        4. Verify DeviceClass is deleted
+        5. Reinstall DRA driver (for test isolation)
+        6. Verify reinstallation succeeded
+
+    Validates:
+        - Helm uninstall succeeds
+        - All DRA driver pods are terminated within 30 seconds
+        - AMD GPU DeviceClass 'gpu.amd.com' is deleted
+        - Reinstall succeeds (pods running)
+
+    Fixtures:
+        dra_driver_install: Ensures DRA driver is installed before test
+        images: Provides image manifest for reinstallation
+
+    kubectl equivalents:
+        helm uninstall <release> -n <namespace>
+        kubectl get pods -n <namespace>
+        kubectl get deviceclasses.resource.k8s.io
+        helm install <release> <chart> -n <namespace>
+
+    Expected outcome:
+        DRA driver uninstalls cleanly and reinstalls successfully
+
+    Notes:
+        This test should run as part of the full test suite, or explicitly
+        when manual cleanup is desired. It maintains test isolation by
+        reinstalling after validation.
     """
     global Logger
 
@@ -319,14 +392,14 @@ def test_dra_driver_uninstall(
         gpu_cluster, dra_driver_namespace
     )
     K8Helper.triage(environment, (ret_code == 0), "Failed to list helm releases")
-    
+
     release_exists = False
     for chart in json.loads(ret_stdout):
         if chart["name"] == dra_driver_release_name:
             release_exists = True
             Logger.info(f"Found helm release to uninstall: {chart}")
             break
-    
+
     K8Helper.triage(
         environment,
         release_exists,
@@ -372,3 +445,71 @@ def test_dra_driver_uninstall(
     )
 
     Logger.info("DRA driver successfully uninstalled and cleaned up")
+
+    # Reinstall DRA driver to maintain test isolation
+    Logger.info("=" * 70)
+    Logger.info("Reinstalling DRA driver for test isolation")
+    Logger.info("=" * 70)
+
+    dra_chart = images.get("dra-driver.helm-chart", None)
+    dra_version = images.get(
+        "dra-driver.version", getattr(environment, "dra_driver_version", "v0.1.0")
+    )
+
+    K8Helper.triage(
+        environment,
+        dra_chart is not None,
+        "DRA driver helm chart not found in image manifest",
+    )
+
+    # Generate values.yaml for DRA driver if needed
+    values_yaml = None
+    if images.get("image.repository.repository") or images.get("dra-driver-image.repository") or images.get("draDriver.image.repository"):
+        values_yaml = os.path.join(
+            environment.logdir, f"dra_driver_values_{dra_version}_reinstall.yaml"
+        )
+        dra_util.generate_dra_driver_values(images, values_yaml)
+        Logger.info(f"Using values file: {values_yaml}")
+
+    Logger.info(f"Reinstalling DRA driver:")
+    Logger.info(f"  Chart: {dra_chart}")
+    Logger.info(f"  Version: {dra_version}")
+    Logger.info(f"  Release: {dra_driver_release_name}")
+    Logger.info(f"  Namespace: {dra_driver_namespace}")
+
+    ret_code, ret_stdout, ret_stderr = helm_util.helm_install(
+        gpu_cluster,
+        dra_driver_release_name,
+        dra_driver_namespace,
+        dra_chart,
+        dra_version,
+        values_yaml,
+    )
+
+    if ret_code != 0:
+        Logger.error(f"Helm reinstall failed: {ret_stderr}")
+    K8Helper.triage(
+        environment,
+        ret_code == 0,
+        f"Failed to reinstall DRA driver: {ret_stderr}",
+    )
+
+    # Wait for DRA driver pods to be ready
+    Logger.info("Waiting for DRA driver pods to be ready after reinstall...")
+    time.sleep(30)
+
+    # Verify reinstallation
+    ret_code, pods = k8_util.k8_get_pods(dra_driver_namespace)
+    K8Helper.triage(environment, ret_code == 0, "Failed to get DRA driver pods after reinstall")
+
+    expected_pod_prefix = f"{dra_driver_release_name}-{DRA_DRIVER_CHART_NAME}"
+    dra_pods = [p for p in pods if expected_pod_prefix in p["metadata"]["name"]]
+
+    K8Helper.triage(
+        environment,
+        len(dra_pods) > 0,
+        f"No DRA driver pods found after reinstall (expected prefix: {expected_pod_prefix})",
+    )
+
+    Logger.info(f"DRA driver successfully reinstalled - found {len(dra_pods)} pod(s)")
+    Logger.info("Test isolation maintained - other tests can run in any order")

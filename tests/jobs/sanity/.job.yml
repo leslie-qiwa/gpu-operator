@@ -165,5 +165,35 @@ e2e-targets:
           - name: testbed-type
             value: K8
 
+  dra-driver-pytest-sanity:
+    commands: [
+        "/bin/sh",
+        "-c",
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
+         /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app dra-driver \
+         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+    ]
+    owners: ["email:leslie.wang@amd.com"]
+    tcp-ports: [5000]
+    area:
+    sub-area:
+    build-dependencies:
+      - build-gpu-operator
+      - build-gpu-operator-k8s
+      - build-external-kernel-module-manager
+      - build-external-kernel-module-signimage
+      - build-external-kernel-module-webhook-server
+      - build-external-kernel-module-worker
+    resources:
+    - generic:
+      - type: K8-GPU-Node
+        vendor: Pensando
+        count: 1
+        props:
+          - name: driver
+            value: devcfg
+          - name: testbed-type
+            value: K8
+
 logfiles:
   - /gpu-operator/tests/pytests/pytest_logs.tgz
