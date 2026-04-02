@@ -6,13 +6,35 @@ set -eu
 # Downloads the security scan bundle via asset-pull, installs the wheel,
 # and invokes jobd-security-scan-orchestrator to run the security scan.
 
+usage() {
+	echo "Usage: $0 <repo_name> [release=\$RELEASE] [branch=\$JOB_BASE_BRANCH] [poll_interval=60] [poll_timeout=7200] [venv_dir=.venv] [config_file=./config.yaml]" >&2
+}
+
+if [ "$#" -lt 1 ]; then
+	echo "Error: missing required argument <repo_name>." >&2
+	usage
+	return 1 2>/dev/null || exit 1
+fi
+
 REPO_NAME="${1}"
-RELEASE="${2}"
-BRANCH="${3}"
+RELEASE="${2:-${RELEASE:-}}"
+BRANCH="${3:-${JOB_BASE_BRANCH:-}}"
 POLL_INTERVAL="${4:-60}"
 POLL_TIMEOUT="${5:-7200}"
 VENV_DIR="${6:-.venv}"
 CONFIG_FILE="${7:-./config.yaml}"
+
+if [ -z "${RELEASE}" ]; then
+	echo "Error: release is required. Provide <release> argument or set RELEASE environment variable." >&2
+	usage
+	return 1 2>/dev/null || exit 1
+fi
+
+if [ -z "${BRANCH}" ]; then
+	echo "Error: branch is required. Provide <branch> argument or set JOB_BASE_BRANCH environment variable." >&2
+	usage
+	return 1 2>/dev/null || exit 1
+fi
 
 BUNDLE_ASSET_NAME="jobd_security_scan_bundle.tar.gz"
 BUNDLE_PACKAGE_NAME="jobd_security_scan_utils"
@@ -22,6 +44,11 @@ JENKINS_CONFIG_NAME="jenkins_config.json"
 
 if ! command -v python3 >/dev/null 2>&1; then
 	echo "Error: python3 is not installed or not in PATH."
+	return 1 2>/dev/null || exit 1
+fi
+
+if ! command -v asset-pull >/dev/null 2>&1; then
+	echo "Error: asset-pull is not installed or not in PATH."
 	return 1 2>/dev/null || exit 1
 fi
 

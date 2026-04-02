@@ -5,13 +5,15 @@ image:
   work_dir: "/gpu-operator/devops/jobs/security_scan/sanity"
 targets:
   security_scan_sanity:
-    commands: ["sh", "../trigger.sh", "gpu-operator", "${RELEASE}", "${JOB_BASE_BRANCH}"]
+    commands: ["sh", "../trigger.sh", "gpu-operator"]
     owners: ["email:karan.nath@amd.com"]
     area:
     sub-area:
     build-dependencies:
       - build-gpu-operator
+      - build-gpu-operator-k8s
     feature:
     asset-dependencies:
       tags: []
 logfiles:
+submodules: {}
