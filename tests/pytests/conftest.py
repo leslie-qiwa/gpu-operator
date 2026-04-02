@@ -102,35 +102,114 @@ def pytest_html_results_summary(prefix, summary, postfix):
     Add custom information to the summary section of the report.
 
     Adds Environment info (AMDGPU Driver, Cluster Nodes) and Images table
-    to the prefix section (appears right after default Environment section).
+    to the prefix section in a 2-column grid layout.
     """
-    # Add AMDGPU Driver info
+    # Build left column (Images Used)
+    left_column_content = []
+    if hasattr(pytest, "_image_info"):
+        left_column_content.extend([
+            html.h3("Images"),
+            transform_image_info(),
+        ])
+
+    # Add test results summary table to the summary section
+    # The summary section shows test result counts
+    # We'll add a styled table showing the breakdown
+    results_table = None
+    if hasattr(pytest, "_config"):
+        # Get test results from terminalreporter
+        config = pytest._config
+        if hasattr(config, 'pluginmanager'):
+            terminalreporter = config.pluginmanager.get_plugin('terminalreporter')
+            if terminalreporter:
+                stats = terminalreporter.stats
+
+                # Count results by category
+                passed = len(stats.get('passed', []))
+                failed = len(stats.get('failed', []))
+                skipped = len(stats.get('skipped', []))
+                error = len(stats.get('error', []))
+                xfailed = len(stats.get('xfailed', []))
+                xpassed = len(stats.get('xpassed', []))
+                rerun = len(stats.get('rerun', []))
+
+                # Create results summary table
+                table_style = "border: 1px solid black; border-collapse: collapse; min-width: 400px; margin: 20px 0;"
+                cell_style = "border: 1px solid black; padding: 10px; min-width: 50px;"
+
+                results_table = html.table(style=table_style)
+                results_table.append(html.tr([
+                    html.th("Result Type", scope="col", style=cell_style),
+                    html.th("Count", scope="col", style=cell_style),
+                ]))
+
+                # Add rows for each result type
+                results_table.append(html.tr([
+                    html.td("Failed", style=cell_style + " color: #dc3545; font-weight: 600;"),
+                    html.td(str(failed), style=cell_style + " text-align: center; font-weight: 600;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Passed", style=cell_style + " color: #28a745; font-weight: 600;"),
+                    html.td(str(passed), style=cell_style + " text-align: center; font-weight: 600;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Skipped", style=cell_style + " color: #ffc107; font-weight: 600;"),
+                    html.td(str(skipped), style=cell_style + " text-align: center; font-weight: 600;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Expected Failures", style=cell_style),
+                    html.td(str(xfailed), style=cell_style + " text-align: center;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Unexpected Passes", style=cell_style),
+                    html.td(str(xpassed), style=cell_style + " text-align: center;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Errors", style=cell_style + " color: #dc3545;"),
+                    html.td(str(error), style=cell_style + " text-align: center;"),
+                ]))
+                results_table.append(html.tr([
+                    html.td("Reruns", style=cell_style),
+                    html.td(str(rerun), style=cell_style + " text-align: center;"),
+                ]))
+
+
+    # Build right column (AMDGPU Driver Version and Cluster Nodes)
+    right_column_content = []
+    if hasattr(pytest, "_k8_cluster_inst"):
+        right_column_content.extend([
+            html.h3("Cluster Nodes"),
+            cluster_info_table(),
+        ])
+
+    # If result-table is available, add it below Cluster Nodes
+    if results_table:
+        right_column_content.extend([
+            html.h3("Test Results Summary"),
+            results_table,
+        ])
+
     if hasattr(pytest, "_amdgpu_driver_spec"):
         ver = pytest._amdgpu_driver_spec.get('default-version', 'NA')
         deployment_mode = pytest._amdgpu_driver_spec.get('driver-deployment', 'NA')
-        prefix.extend([
-            html.h3("AMDGPU Driver Version"),
+        right_column_content.extend([
+            html.h3("AMDGPU Driver Version", style="margin-top: 30px;"),
             html.p(
                 html.strong(f"Version: {ver} | Deployment: {deployment_mode}"),
                 style="font-size: 16px; color: #212529; margin: 10px 0;"
             ),
         ])
 
-    # Add Cluster Information
-    if hasattr(pytest, "_k8_cluster_inst") and hasattr(pytest, "_nodes_version"):
-        prefix.extend([
-            html.h3("Cluster Nodes"),
-            cluster_info_table(),
-            html.br()
-        ])
+    # Create 2-column grid layout with 60/40 split
+    if left_column_content or right_column_content:
+        grid_container = html.div(
+            html.div(*left_column_content, style="grid-column: 1;") if left_column_content else html.div(),
+            html.div(*right_column_content, style="grid-column: 2;") if right_column_content else html.div(),
+            style="display: grid; grid-template-columns: 60% 40%; gap: 30px; margin: 20px 0;"
+        )
+        prefix.append(grid_container)
+        prefix.append(html.br())
 
-    # Add Images table
-    if hasattr(pytest, "_image_info"):
-        prefix.extend([
-            html.h3("Images Used"),
-            transform_image_info(),
-            html.br()
-        ])
     
 def cluster_info_table():
     gpu_series_by_host = {
@@ -144,18 +223,27 @@ def cluster_info_table():
     table = html.table(style=table_style)
     header_row = html.tr([
         html.th("Node Name", scope="col", style=cell_style),
-        html.th("K8-Version", scope="col", style=cell_style),
+        html.th("IP Address", scope="col", style=cell_style),
         html.th("GPU-Series", scope="col", style=cell_style),
+        html.th("GPU Count", scope="col", style=cell_style),
+        html.th("K8-Version", scope="col", style=cell_style),
+        html.th("Host OS Type", scope="col", style=cell_style),
+        html.th("Host OS Name", scope="col", style=cell_style),
+        html.th("Host OS Version", scope="col", style=cell_style),
     ])
     table.append(header_row)
 
-    for node_name, k8_version in pytest._nodes_version.items():
+    for node in pytest._k8_cluster_inst.cluster_nodes:
         table.append(html.tr([
-            html.td(node_name, scope="col", style=cell_style),
-            html.td(k8_version, scope="col", style=cell_style),
-            html.td(gpu_series_by_host.get(node_name, "N/A"), scope="col", style=cell_style),
+            html.td(node.host_name, scope="col", style=cell_style),
+            html.td(node.ip_address, scope="col", style=cell_style),
+            html.td(node.gpu_series, scope="col", style=cell_style),
+            html.td(node.num_gpus, scope="col", style=cell_style),
+            html.td(node.k8_version, scope="col", style=cell_style),
+            html.td(node.host_os_type, scope="col", style=cell_style),
+            html.td(node.host_os_name, scope="col", style=cell_style),
+            html.td(node.host_os_version, scope="col", style=cell_style)
         ]))
-
     return table
 
 def transform_image_info():
@@ -189,16 +277,42 @@ def transform_image_info():
             table.append(row)
     return table
 
-@pytest.hookimpl(optionalhook=True)
 def pytest_metadata(metadata):
     """
-    Clear default pytest metadata.
+    Populate metadata with command-line options.
+
+    This hook is called by pytest-metadata plugin and receives the metadata dict.
+    We populate it with our custom command-line options and remove default pytest
+    metadata fields that are not relevant for our test reports.
 
     Note: Custom environment information (AMDGPU Driver, Cluster Nodes, Images)
     is added via pytest_html_results_summary hook instead, which runs after
     fixtures execute and have populated the necessary pytest._ attributes.
     """
-    metadata.clear()
+    # Remove default pytest-html metadata fields we don't need in the report
+    fields_to_remove = ['Python', 'Platform', 'Packages', 'Plugins']
+    for field in fields_to_remove:
+        metadata.pop(field, None)
+
+    # This hook runs after pytest_configure, so config should be available
+    if hasattr(pytest, "_config"):
+        config = pytest._config
+        option = config.option
+
+        # Add custom pytest options we defined in pytest_addoption
+        custom_options = {
+            'Deployment': getattr(option, 'deployment', None),
+            'Image Manifest': getattr(option, 'image_manifest', None),
+            'Alternative Image Manifest': getattr(option, 'alternative_image_manifest', None),
+            'Secrets JSON': getattr(option, 'secrets_json', None),
+            'AMDGPU Driver Spec': getattr(option, 'amdgpu_driver_spec', None),
+            'Tech Support Tool': getattr(option, 'tech_support_tool', None),
+            'Workload Selection': getattr(option, 'workload_selection', None),
+        }
+
+        for key, value in custom_options.items():
+            if value:
+                metadata[key] = value
 
 class Context(object):
     pass
@@ -267,21 +381,19 @@ def gpu_cluster(request, environment):
     ret_code, k8_nodes = k8_util.k8_get_nodes()
     assert ret_code == 0, "Failed to collect nodes from cluster"
     nodes = list()
-    nodes_version = {}
     for node in k8_nodes:
-        nodes_version[node['metadata']['name']] = node['status']['node_info']['kubelet_version']
+        k8_version = node['status']['node_info']['kubelet_version']
         node_ip = k8_util.k8_get_node_address(node)
         if 'node-role.kubernetes.io/control-plane' in node['metadata']['labels']:
-            nodes.append(common.Node(node_ip, None, None, None, "master", None))
+            nodes.append(common.Node(node_ip, None, None, None, "master", k8_version))
         else:
-            nodes.append(common.Node(node_ip, None, None, None, "worker", None))
+            nodes.append(common.Node(node_ip, None, None, None, "worker", k8_version))
     k8_cluster_inst = common.k8_cluster.BuildK8Cluster(nodes)
     k8_cluster_inst.k8_kube_config = environment.kube_config_file
-    assert len(k8_cluster_inst.cluster_nodes) > 0, f"Failed to collect worker nodes from k8/cluster"
+    assert len(k8_cluster_inst.cluster_nodes) > 0, f"Failed to collect nodes from k8/cluster"
     if hasattr(environment, "k8_secrets_file"):
         with open(environment.k8_secrets_file) as fp:
             k8_cluster_inst.k8_secrets = json.load(fp)
-    setattr(pytest, "_nodes_version",  nodes_version)
     setattr(pytest, "_k8_cluster_inst", k8_cluster_inst)
     return k8_cluster_inst
 
@@ -611,6 +723,94 @@ def pytest_html_results_table_header(cells):
     cells.insert(3, html.th("Failure Message"))
 
 def pytest_html_results_table_row(report, cells):
+    # Format the test ID (nodeid) to be more readable
+    # Example: openshift/gpu-operator/test_metrics_values.py::test_exporter_metrics_value_accuracy[GPU_CLOCK:GPU_CLOCK_TYPE_DATA]
+    # Should become multi-line format with deployment, application, module, test case, and parameters
+
+    import re
+    from py.xml import html as html_builder
+
+    nodeid = getattr(report, 'nodeid', '')
+
+    if nodeid:
+        # Parse the nodeid components
+        # Format: <path>::<test_name>[<params>]
+        parts = nodeid.split('::')
+        path_part = parts[0] if len(parts) > 0 else ''
+        test_part = parts[1] if len(parts) > 1 else ''
+
+        # Split path into deployment/application/module
+        path_components = path_part.split('/')
+
+        # Extract test name and parameters
+        param_match = re.match(r'([^\[]+)(\[.+\])?', test_part)
+        test_name = param_match.group(1) if param_match else test_part
+        params = param_match.group(2) if param_match and param_match.group(2) else ''
+
+        # Build formatted elements using html builder
+        formatted_parts = []
+
+        # Add path components (deployment/application)
+        if len(path_components) > 2:
+            # First component: deployment
+            formatted_parts.append(
+                html_builder.div(
+                    html_builder.strong("Deployment: "),
+                    path_components[0],
+                    style="color: #6c757d; font-size: 11px;"
+                )
+            )
+            # Second component: application
+            formatted_parts.append(
+                html_builder.div(
+                    html_builder.strong("Application: "),
+                    path_components[1],
+                    style="color: #6c757d; font-size: 11px;"
+                )
+            )
+            # Module (last component of path)
+            formatted_parts.append(
+                html_builder.div(
+                    html_builder.strong("Module: "),
+                    path_components[-1],
+                    style="color: #212529; font-size: 12px;"
+                )
+            )
+        else:
+            # Just show the full path if it doesn't match expected format
+            formatted_parts.append(
+                html_builder.div(
+                    html_builder.strong("Path: "),
+                    path_part,
+                    style="color: #212529; font-size: 12px;"
+                )
+            )
+
+        # Add test name
+        formatted_parts.append(
+            html_builder.div(
+                test_name,
+                style="color: #212529; font-weight: 600; margin-top: 4px;"
+            )
+        )
+
+        # Add parameters if present
+        if params:
+            # Remove brackets and format parameters
+            params_clean = params.strip('[]')
+            formatted_parts.append(
+                html_builder.div(
+                    html_builder.em(params_clean),
+                    style="color: #17a2b8; font-size: 11px; margin-top: 2px;"
+                )
+            )
+
+        # Replace the Test ID cell (cells[1]) with formatted version
+        cells[1] = html.td(
+            html_builder.div(*formatted_parts),
+            style="white-space: normal; max-width: 350px;"
+        )
+
     # Retrieve the description we stored in the previous hook
     description = getattr(report, 'description', "")
     cells.insert(2, html.td(description))
@@ -628,6 +828,7 @@ def pytest_runtest_setup(item):
     """Add custom CSS to beautify HTML reports."""
     yield
 
+@pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
     config.addinivalue_line(
         "markers", "upgrade: mark test as operator/operand upgrade test"
@@ -636,7 +837,11 @@ def pytest_configure(config):
     """
     Add custom CSS styling to the HTML report for better aesthetics.
     Writes CSS to a temporary file and registers it with pytest-html.
+    Also stores config for access in pytest_metadata hook.
     """
+    # Store config FIRST (tryfirst ensures this runs before pytest_metadata)
+    setattr(pytest, "_config", config)
+
     # Define custom CSS content
     css_content = """
         /* ==================== Color Scheme ==================== */
@@ -696,12 +901,7 @@ def pytest_configure(config):
         }
 
         /* ==================== Summary Section ==================== */
-        /* Hide empty environment section and its header */
-        #environment-header, #environment {
-            display: none !important;
-        }
-
-        .metadata {
+        #environment, .metadata {
             background: var(--white);
             padding: 25px;
             border-radius: 10px;
@@ -710,17 +910,23 @@ def pytest_configure(config):
             border-left: 5px solid var(--amd-red);
         }
 
-        /* Environment table styling for proper vertical layout */
+        /* Environment table styling to match summary tables */
+        #environment {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+        }
+
         #environment td {
             padding: 12px 15px !important;
             vertical-align: top !important;
             border-bottom: 1px solid var(--border-color) !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
 
         #environment tr:first-child td {
             font-weight: 600;
             color: var(--text-dark);
             min-width: 200px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
 
         #environment tr:nth-child(odd) {
@@ -741,6 +947,7 @@ def pytest_configure(config):
         #environment ul li {
             margin: 4px 0 !important;
             line-height: 1.6 !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
         }
 
         .summary {

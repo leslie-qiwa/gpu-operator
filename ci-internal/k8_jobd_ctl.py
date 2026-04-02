@@ -964,12 +964,12 @@ def _generate_report(logger):
         module_name = ""
         module_statistics = dict()
         for idx, test in enumerate(results['testsuites']['testsuite']['testcase']):
-            mod_name = test['@classname']
+            mod_name = test['@classname'] or 'unknown_module'
             row_entry = []
             if module_name != mod_name:
                 module_name = mod_name
                 row_entry.append(module_name)
-                module_statistics[module_name] = { 
+                module_statistics[module_name] = {
                     'tm_pass_count' : 0,
                     'tm_fail_count' : 0,
                     'tm_skip_count' : 0,
@@ -977,6 +977,15 @@ def _generate_report(logger):
                 }
             else:
                 row_entry.append("")
+
+            # Ensure module entry exists (handles edge case of first test with empty classname)
+            if module_name not in module_statistics:
+                module_statistics[module_name] = {
+                    'tm_pass_count' : 0,
+                    'tm_fail_count' : 0,
+                    'tm_skip_count' : 0,
+                    'module_time'   : 0.0,
+                }
 
             if test.get('failure', None) or test.get('error', None):
                 module_statistics[module_name]['tm_fail_count'] = module_statistics[module_name]['tm_fail_count'] + 1

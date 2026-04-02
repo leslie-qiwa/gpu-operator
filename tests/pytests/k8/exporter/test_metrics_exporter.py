@@ -408,8 +408,7 @@ def test_exporter_nodeport_exp_config(request, gpu_cluster, amdgpu_driver_instal
         Logger.debug(f"Result of configmap delete operation, ret_code:{ret_code}, ret_stdout: {ret_stdout.strip()}, err: {ret_stderr.strip()}")
         # ignore ret_code
         ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.exporter_namespace,
-                                                                       exp_config_name,
-                                                                       configmap_file)
+                                                                       exp_config_name, configmap_file, "config.json")
         K8Helper.triage(environment, ret_code == 0,
                         f"Failed to create configmap {exp_config_name} for {configmap_file}, err: {ret_stderr.strip()}")
         exporter_config_defn[exp_config_name] = (label_subset, metric_subset)
@@ -606,8 +605,7 @@ def test_exporter_all_supported_metrics(request, gpu_cluster, amdgpu_driver_inst
     Logger.debug(f"Result of configmap delete operation, ret_code:{ret_code}, ret_stdout: {ret_stdout.strip()}, err: {ret_stderr.strip()}")
     # ignore ret_code
     ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.exporter_namespace,
-                                                                   exp_config_name,
-                                                                   configmap_file)
+                                                                   exp_config_name, configmap_file, "config.json")
     K8Helper.triage(environment, ret_code == 0,
                     f"Failed to create configmap {exp_config_name} for {configmap_file}, err: {ret_stderr.strip()}")
     Logger.info(f"Created configmap {exp_config_name}")

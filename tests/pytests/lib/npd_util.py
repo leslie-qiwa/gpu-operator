@@ -99,13 +99,13 @@ def _run_tasks(task_list, stop_on_failure = True) -> int:
                 final_ret_code = ret_code
     return final_ret_code
 
-def init_npd_k8(gpu_cluster) -> (int, str, str):
+def init_npd_k8(gpu_cluster, environment) -> (int, str, str):
     """
     API to configure default service-account and rbac
     """
 
     # Lets cleanup for any trace from previous deployment
-    fini_npd_k8(gpu_cluster)
+    fini_npd_k8(gpu_cluster, environment)
     # --- 1. RBAC: ServiceAccount ---
 
     rules = list()
@@ -128,9 +128,16 @@ def init_npd_k8(gpu_cluster) -> (int, str, str):
 
     # --- 3. DAEMONSET: The NPD Workload ---
     Logger.info(f"Deploy/Configure node-problem-detector with default config-map")
+    # TODO: Dump the DEFAULT_NPD_CONFIGMAP under log folder and 
+
+    default_cfgmap_file = os.path.join(environment.log, "npd_default_configmap.json")
+    with open(default_cfgmap_file, "w") as fp:
+        json.dump(json.loads(DEFAULT_NPD_CONFIGMAP), fp, indent=4)
+
     todo_tasks = [
         (k8_util.k8_create_configmap, "Failed to init npd config-map",
-         (NPD_NAMESPACE, DEFAULT_NPD_CONFIGMAP["metadata"]["name"], None,)),
+         (NPD_NAMESPACE, DEFAULT_NPD_CONFIGMAP["metadata"]["name"],
+          default_cfgmap_file, DEFAULT_NPD_CONFIGMAP["metadata"]["name"],)),
         (k8_util.k8_patch_daemonset, "Failed to apply/patch daemonset",
          (NPD_APP_NAME, NPD_NAMESPACE, DEFAULT_NPD_DAEMONSET,))
     ]
@@ -141,7 +148,7 @@ def init_npd_k8(gpu_cluster) -> (int, str, str):
     Logger.info(f"Successfully deployed node-problem-detector {NPD_APP_NAME} in namespace {NPD_NAMESPACE}")
     return ret_code, "", ""
 
-def fini_npd_k8(gpu_cluster) -> (int, str, str):
+def fini_npd_k8(gpu_cluster, environment) -> (int, str, str):
     """
     API to remove/uninstall node-problem-detector and custom plugin
     """
@@ -171,7 +178,7 @@ def fini_npd_k8(gpu_cluster) -> (int, str, str):
         Logger.warning("Failed to cleanup npd cluster role-binding/cluster-role/service-account - ignored")
     return 0, "", ""
 
-def init_npd_oc(gpu_cluster) -> (int, str, str):
+def init_npd_oc(gpu_cluster, environment) -> (int, str, str):
     """
     oc create clusterrolebinding npd-privileged-scc \
     --clusterrole=system:openshift:scc:privileged \
@@ -202,8 +209,8 @@ def init_npd_oc(gpu_cluster) -> (int, str, str):
         (k8_util.k8_create_namespace, f"Failed to create namespace : {NPD_NAMESPACE}", (NPD_NAMESPACE,)),
         (k8_util.k8_create_service_account, f"Failed to create service-account {NPD_APP_NAME}", (NPD_SA_NAME, NPD_NAMESPACE,)),
         # Bind to existing system:openshift:scc:privileged ClusterRole instead of trying to create it
-        (k8_util.k8_create_cluster_role_binding, "Failed to create cluster-role binding for privileged SCC",
-         ("npd-scc-privileged-binding", "system:openshift:scc:privileged", NPD_SA_NAME, NPD_NAMESPACE,))
+        (k8_util.k8_create_role_binding, "Failed to create cluster-role binding for privileged SCC",
+         ("npd-scc-privileged-binding", NPD_NAMESPACE, "system:openshift:scc:privileged", NPD_SA_NAME, ))
     ]
 
     ret_code = _run_tasks(todo_tasks)
@@ -230,11 +237,11 @@ def init_npd_oc(gpu_cluster) -> (int, str, str):
                                                               values_yaml = None, **opts)
     return ret_code, ret_stdout, ret_stderr
 
-def fini_npd_oc(gpu_cluster) -> (int, str, str):
+def fini_npd_oc(gpu_cluster, environment) -> (int, str, str):
     ret_code, ret_stdout, ret_stderr = helm_util.helm_uninstall(gpu_cluster, "npd", NPD_NAMESPACE)
     return ret_code, ret_stdout, ret_stderr
 
-def deploy_npd_amdgpuhealth_plugin(metric_type : str, metric_to_test : str, threshold : int):
+def deploy_npd_amdgpuhealth_plugin(environment, metric_type : str, metric_to_test : str, threshold : int):
     # Note the fix: strings for max_output_length/concurrency
     amdgpu_config = {
         "plugin": "custom",
@@ -335,7 +342,7 @@ def deploy_npd_amdgpuhealth_plugin(metric_type : str, metric_to_test : str, thre
     ret_code = _run_tasks(todo_tasks)
     return ret_code
 
-def remove_npd_amdgpuhealth_plugin():
+def remove_npd_amdgpuhealth_plugin(environment):
     Logger.info(f"Remove/Restore node-problem-detector")
 
     #todo_tasks = [

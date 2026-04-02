@@ -312,7 +312,7 @@ def test_custom_configmap(gpu_cluster, images, deviceconfig_install, environment
         yaml.dump(custom_mapping, fp, default_flow_style=False)
 
     k8_util.k8_delete_configmap(environment.gpu_operator_namespace, configmap_name)
-    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace, configmap_name, configmap_file)
+    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace, configmap_name, configmap_file, "workflow")
     K8Helper.triage(environment, (ret_code == 0), f"Failed to create configmap {configmap_name} for {configmap_file}, err: {ret_stderr.strip()}")
     
     remediation_label_key = "amd.com/remediating"
@@ -532,7 +532,7 @@ def test_skip_reboot_step(gpu_cluster, deviceconfig_install, environment, reques
         yaml.dump(skip_reboot_mapping, fp, default_flow_style=False)
 
     k8_util.k8_delete_configmap(environment.gpu_operator_namespace, CONFIGMAP_NAME)
-    ret_code, _, err = k8_util.k8_create_configmap(environment.gpu_operator_namespace, CONFIGMAP_NAME, configmap_file)
+    ret_code, _, err = k8_util.k8_create_configmap(environment.gpu_operator_namespace, CONFIGMAP_NAME, configmap_file, "workflow")
     K8Helper.triage(environment, (ret_code == 0), f"Failed to create configmap: {err}")
 
     for spec_name, tcfg in deviceconfig_install.test_cfg_map.items():

@@ -203,9 +203,9 @@ def gpu_operator_install(gpu_cluster, gpu_operator_release_name, images, environ
 def deploy_npd_daemonset(gpu_cluster, environment):
     global Logger
     Logger.info("Deploy node-problem-detector with default configuration")
-    npd_util.init_npd_oc()
+    npd_util.init_npd_oc(gpu_cluster, environment)
     yield
     Logger.info("Cleanup node-problem-detector")
-    npd_util.fini_npd_oc()
+    npd_util.fini_npd_oc(gpu_cluster, environment)
     return
 

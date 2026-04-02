@@ -61,7 +61,7 @@ def k8_lib_init(k8_kube_config : str) -> None:
     ret_code, k8_nodes = k8_get_nodes()
     for node in k8_nodes:
         node_name = node['metadata']['labels']['kubernetes.io/hostname']
-        k8_untaint_node(node_name)
+        k8_untaint_node(node_name, effects=["NoSchedule", "NoExecute"])
     assert ret_code == 0, f"Failed to collect worker nodes from k8/cluster"
 
 def k8_init_cluster(k8_cluster : common.k8_cluster, namespaces):
@@ -1223,7 +1223,7 @@ def k8_check_pod_terminated(namespace : str, pod_list : List, sleep_time : int =
     return running_pods
 
 @log_arguments
-def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : str):
+def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : str, config_map_name : str):
     """
     API to create configmap in a k8-cluster
 
@@ -1236,14 +1236,14 @@ def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : 
     if os.path.splitext(configmap_file)[1] == '.json' : 
         with open(configmap_file) as fp:
             data = json.load(fp)
-        data = {"config.json" : json.dumps(data)}
+        data = {config_map_name : json.dumps(data)}
     elif os.path.splitext(configmap_file)[1] == '.crt' : 
         with open(configmap_file, "r", encoding="utf-8") as fp:
             raw_text = fp.read()
-        data = {os.path.basename(configmap_file) : raw_text}
+        data = {config_map_name : raw_text}
     elif os.path.splitext(configmap_file)[1] == '.yaml':
         with open(configmap_file, "r") as fp:
-            data = {"workflow": fp.read()}
+            data = {config_map_name : fp.read()}
     else:
         Logger.error(
             f"Unsupported file type for '{configmap_file}'. "
@@ -1476,46 +1476,105 @@ def k8_get_pod_logs(pod_str : str, namespace : str, since="180s", container = No
         return 0, "", str(e)
 
 @log_arguments
-def k8_taint_node(node_name : str, taint_add=True):
+def k8_taint_node(node_name : str, taint_add=True, effect="NoSchedule"):
     """
-    API to taint node
+    Add or remove amd-dcm taint from a node.
 
-    Example: kubectl taint nodes node_name gpu=unhealthy:NoSchedule
+    This function adds or removes the amd-dcm=up taint with the specified effect.
+    Only the amd-dcm taint is modified; other existing taints are preserved.
+
+    Args:
+        node_name: Name of the Kubernetes node to taint/untaint
+        taint_add: True to add the taint, False to remove it (default: True)
+        effect: Taint effect - "NoSchedule", "NoExecute", or "PreferNoSchedule" (default: "NoSchedule")
+                - NoSchedule: Prevents new pods from scheduling (existing pods continue)
+                - NoExecute: Evicts existing pods and prevents new scheduling
+                - PreferNoSchedule: Soft version of NoSchedule
+
+    Examples:
+        # Add NoSchedule taint (default)
+        k8_taint_node("worker-1", taint_add=True)
+
+        # Add NoExecute taint (evicts existing pods)
+        k8_taint_node("worker-1", taint_add=True, effect="NoExecute")
+
+        # Remove taint (effect doesn't matter when removing)
+        k8_taint_node("worker-1", taint_add=False)
+
+    Notes:
+        - For DCM partition operations, use effect="NoExecute" to evict device-plugin pods
+        - Retries up to 5 times on conflict errors
+        - Preserves other taints on the node (e.g., master, control-plane taints)
     """
     global Logger
     taint_key = "amd-dcm"
     taint_value = "up"
-    taint_effect = "NoSchedule"
+
+    # Validate effect parameter
+    valid_effects = ["NoSchedule", "NoExecute", "PreferNoSchedule"]
+    if effect not in valid_effects:
+        Logger.error(f"Invalid taint effect '{effect}'. Must be one of: {valid_effects}")
+        return
 
     v1 = client.CoreV1Api()
     node = v1.read_node(name=node_name)
-    new_taint = client.V1Taint(key=taint_key, value=taint_value, effect=f"{taint_effect}")
 
-    node.spec.taints = []
+    # Preserve existing taints, only modify amd-dcm taint
+    existing_taints = node.spec.taints or []
+
+    # Remove any existing amd-dcm taints (to avoid duplicates and handle effect changes)
+    filtered_taints = [
+        t for t in existing_taints
+        if not (t.key == taint_key and t.value == taint_value)
+    ]
+
+    # Add the new taint if requested
     if taint_add:
-        node.spec.taints = [new_taint]
+        new_taint = client.V1Taint(key=taint_key, value=taint_value, effect=effect)
+        filtered_taints.append(new_taint)
+        Logger.info(f"Adding taint to node '{node_name}': {taint_key}={taint_value}:{effect}")
+    else:
+        Logger.info(f"Removing taint from node '{node_name}': {taint_key}={taint_value}")
+
+    node.spec.taints = filtered_taints
 
     # Update the node object with the modified taints
-    for _ in range(5):
+    for attempt in range(5):
         try:
             v1.patch_node(name=node_name, body=node)
-            Logger.info(f"Node '{node_name}' successfully tainted with {taint_key}={taint_value}:{taint_effect}, taint={taint_add}")
+            action = "added" if taint_add else "removed"
+            Logger.info(f"Successfully {action} taint on node '{node_name}': {taint_key}={taint_value}:{effect}")
             break
         except client.ApiException as e:
-            Logger.warning(f"Error tainting node: {e}")
+            Logger.warning(f"Error modifying taint on node '{node_name}' (attempt {attempt + 1}/5): {e}")
             if e.reason == "Conflict":
+                # Node was modified by another process, re-read and retry
                 time.sleep(5)
+                node = v1.read_node(name=node_name)
+                existing_taints = node.spec.taints or []
+                filtered_taints = [
+                    t for t in existing_taints
+                    if not (t.key == taint_key and t.value == taint_value)
+                ]
+                if taint_add:
+                    new_taint = client.V1Taint(key=taint_key, value=taint_value, effect=effect)
+                    filtered_taints.append(new_taint)
+                node.spec.taints = filtered_taints
                 continue
+            else:
+                Logger.error(f"Failed to modify taint on node '{node_name}': {e}")
+                break
     return
 
 @log_arguments
-def k8_untaint_node(node_name : str):
+def k8_untaint_node(node_name : str, effects=["NoSchedule"]):
     """
     API to untaint node
 
     Example: kubectl untaint nodes node_name gpu=unhealthy:NoSchedule
     """
-    return k8_taint_node(node_name, taint_add=False)
+    for effect in effects:
+        k8_taint_node(node_name, taint_add=False, effect=effect)
 
 @log_arguments
 def k8_patch_deployment(deployment, namespace, new_toleration, tolerate_add):
@@ -1739,7 +1798,7 @@ def k8_metrics_error(counts, error_list, namespace : str):
             "rm -f /tmp/ecc.json",
             f"echo '{ecc_json}' > /tmp/ecc.json",
             "cat /tmp/ecc.json",
-            "metricsclient -ecc-file-path /tmp/ecc.json"]
+            "metricsclient --ecc-file-path /tmp/ecc.json"]
     try:
         for cmd in cmds:
             resp = stream.stream(

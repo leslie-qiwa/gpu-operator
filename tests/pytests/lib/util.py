@@ -65,7 +65,7 @@ class K8Helper:
             Logger.info("Using inbox amdgpu driver - skip kmm verification")
             return
 
-        time.sleep(20)
+        time.sleep(10)
         upgrade_complete = False
         for _ in range(10):
             pending_nodes = set(map(lambda x: x['metadata']['name'], gpu_nodes))
@@ -91,9 +91,10 @@ class K8Helper:
                                     Logger.warn(f"DeviceConfig nodeModuleStatus does not have status information")
             if len(pending_nodes) > 0:
                 Logger.info(f"Waiting for {pending_nodes} to complete upgrade process")
-                time.sleep(120)
+                time.sleep(60)
             else:
                 upgrade_complete = True
+                break
 
         if not upgrade_complete:
             Logger.error("Failed to complete upgrade-process for all nodes")
@@ -153,8 +154,8 @@ class K8Helper:
         build_pods.append(common.PodInfo(f"{devcfg_name}-build", 1, 1))
 
         build_pod_status = set()
-        time.sleep(20)
-        for _ in range(10):
+        time.sleep(10)
+        for _ in range(15):
             build_pod_status.clear()
             status_info = k8_util.k8_check_pod_status(environment.gpu_operator_namespace, build_pods)
             Logger.debug(f"build pod status: {status_info}")
@@ -171,8 +172,8 @@ class K8Helper:
                     build_pod_status.add(K8Helper.PodStatus.UNKNOWN)
 
             if K8Helper.PodStatus.PENDING in build_pod_status or K8Helper.PodStatus.RUNNING in build_pod_status:
-                Logger.debug("Wait for 120-sec as some of the build pods are in Running/Pending status")
-                time.sleep(120)
+                Logger.debug("Wait for 60-sec as some of the build pods are in Running/Pending status")
+                time.sleep(60)
             else:
                 break
 
@@ -188,8 +189,8 @@ class K8Helper:
             kmm_worker_pods.append(common.PodInfo(f"kmm-worker-{node_name}-", 1, 1))
 
         kmm_pod_status = set()
-        time.sleep(20)
-        for _ in range(5):
+        time.sleep(10)
+        for _ in range(8):
             kmm_pod_status.clear()
             status_info = k8_util.k8_check_pod_status(environment.gpu_operator_namespace, kmm_worker_pods)
             Logger.debug(f"kmm-worker status: {status_info}")
@@ -206,8 +207,8 @@ class K8Helper:
                     kmm_pod_status.add(K8Helper.PodStatus.UNKNOWN)
 
             if K8Helper.PodStatus.PENDING in kmm_pod_status or K8Helper.PodStatus.RUNNING in kmm_pod_status:
-                Logger.debug("Wait for 120-sec as some of the kmm-worker pods are in Running/Pending status")
-                time.sleep(120)
+                Logger.debug("Wait for 60-sec as some of the kmm-worker pods are in Running/Pending status")
+                time.sleep(60)
             else:
                 break
 
@@ -217,7 +218,7 @@ class K8Helper:
 
         # Finally check for labels
         label_missing = set()
-        for _ in range(5):
+        for _ in range(8):
             label_missing.clear()
             ret_code, gpu_nodes = k8_util.k8_get_gpu_nodes()
             K8Helper.triage(environment, ret_code == 0, "Error while getting gpu-nodes from k8-cluster")
@@ -234,7 +235,7 @@ class K8Helper:
                     label_missing.add(node['metadata']['name'])
             if len(label_missing) > 0:
                 Logger.warn(f"Missing kmm.ready label for {label_missing}")
-                time.sleep(120)
+                time.sleep(60)
         K8Helper.triage(environment, label_found, f"One or more nodes missing kmm.ready label : {label_missing}")
         return
 
@@ -252,6 +253,52 @@ class K8Helper:
             #    K8Helper.triage(environment, conditions[0].get('status') == 'True', f"deviceconfig {devcfg} status is not True")
             #    K8Helper.triage(environment, conditions[0].get('type') == 'Ready', f"deviceconfig {devcfg} type is not Ready")
         return
+
+    @staticmethod
+    def wait_for_driver_reload(environment, gpu_nodes, fail_on_timeout=True):
+        """Wait for driver reload to complete after untainting nodes.
+
+        After untainting nodes, KMM reloads the amdgpu driver. This function waits for
+        device-plugin pods to be Running, which confirms the driver is loaded and ready
+        for amd-smi queries.
+
+        This prevents subsequent tests from failing with "Failed to parse amd-smi-partition
+        JSON" errors when querying amd-smi while the driver is still loading.
+
+        Args:
+            environment: Test environment fixture.
+            gpu_nodes: List of GPU node objects from k8_get_gpu_nodes().
+            fail_on_timeout: If True, call triage() on timeout. If False, just log error.
+
+        Returns:
+            bool: True if pods are Running, False if timeout occurred.
+        """
+        global Logger
+        import time
+        Logger.info("Waiting for device-plugin to be Running (confirms driver reload complete)...")
+        devicecfg_pods = [
+            common.PodInfo('device-plugin', len(gpu_nodes), 1),
+        ]
+        max_retries = 6  # 6 retries * 20s sleep = 120s total wait
+        retry_delay = 20
+        failed_pods = None
+        for retry in range(max_retries):
+            failed_pods = k8_util.k8_check_pod_running(environment.gpu_operator_namespace,
+                                                       devicecfg_pods, sleep_time=retry_delay)
+            if not failed_pods:
+                Logger.info("Device-plugin pods Running - driver reload complete")
+                return True
+            if retry < max_retries - 1:
+                Logger.warning(f"Pods not ready (retry {retry+1}/{max_retries}): {failed_pods}, retrying in {retry_delay}s...")
+                time.sleep(retry_delay)
+            else:
+                Logger.error(f"Pods failed to become Ready after {max_retries * retry_delay}s: {failed_pods}")
+
+        # Timeout occurred
+        if fail_on_timeout:
+            K8Helper.triage(environment, False,
+                           f"Device-plugin not Running after driver reload: {failed_pods}")
+        return False
 
     @staticmethod
     def check_deviceconfig_driver_version(gpu_cluster, config_version, environment):

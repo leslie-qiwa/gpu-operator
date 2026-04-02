@@ -37,7 +37,7 @@ Logger = logging.getLogger("lib.common")
 def log_struct_members(struct):
     Logger.info("Struct contents: " + ", ".join(f"{k}={v}" for k, v in vars(struct).items()))
 
-Node = namedtuple("Node", ["IpAddress", "Username", "Password", "Identity", "NodeType", "GPUSeries"])
+Node = namedtuple("Node", ["IpAddress", "Username", "Password", "Identity", "NodeType", "K8Version"])
 PodInfo = namedtuple("PodInfo", ["PodName", "NumInstances", "ContainerCount"])
 
 class TestbedType(Enum):
@@ -64,6 +64,7 @@ class cluster_node(object):
         self._host_os_type = "unknown"
         self._host_os_name = "unknown"
         self._host_os_version = "0.0"
+        self._k8_version = "NA"
 
     @property
     def ip_address(self):
@@ -153,6 +154,14 @@ class cluster_node(object):
     @host_os_version.setter
     def host_os_version(self, os_version):
         self._host_os_version = os_version
+
+    @property
+    def k8_version(self):
+        return self._k8_version
+
+    @k8_version.setter
+    def k8_version(self, k8_version):
+        self._k8_version = k8_version
 
     def is_gpu_node(self):
         if self._gpu_series != None:
@@ -398,6 +407,7 @@ class k8_cluster(cluster):
         master_nodes = list()
         for node in nodes:
             c_node = cluster_node(node.IpAddress, node.Username, node.Password, node.Identity)
+            c_node.k8_version = node.K8Version
             cluster_nodes.append(c_node)
             if node.NodeType == "master":
                 master_nodes.append(c_node)

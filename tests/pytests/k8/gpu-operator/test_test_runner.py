@@ -362,8 +362,7 @@ def create_configmap(request, deviceconfig_install, environment, framework, conf
     Logger.info(f"Result of configmap delete operation, ret_code:{ret_code}, ret_stdout: {ret_stdout.strip()}, err: {ret_stderr.strip()}")
     # ignore ret_code
     ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,
-                                                                   configmap_name,
-                                                                   configmap_file)
+                                                                   configmap_name, configmap_file, "config.json")
     debug_on_failure(environment, (ret_code == 0),
                      f"Failed to create configmap {configmap_name} for {configmap_file}, err: {ret_stderr.strip()}")
 

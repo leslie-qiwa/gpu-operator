@@ -202,13 +202,13 @@ def test_exporter_amdgpuhealth_counter(request, gpu_cluster, deviceconfig_instal
     global Logger
 
     def _cleanup_npd_config():
-        npd_util.remove_npd_amdgpuhealth_plugin()
+        npd_util.remove_npd_amdgpuhealth_plugin(environment)
 
     request.addfinalizer(_cleanup_npd_config)
 
     _cleanup_npd_config()
 
-    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin("counter-metric", metric_to_test, threshold)
+    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin(environment, "counter-metric", metric_to_test, threshold)
     K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
     # TODO: Check for daemon-set rollout, node-condition
 
@@ -249,11 +249,11 @@ def test_exporter_amdgpuhealth_gauge(request, gpu_cluster, deviceconfig_install,
     global Logger
 
     def _cleanup_npd_config():
-        npd_util.remove_npd_amdgpuhealth_plugin()
+        npd_util.remove_npd_amdgpuhealth_plugin(environment)
 
     request.addfinalizer(_cleanup_npd_config)
 
     _cleanup_npd_config()
-    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin("gauge-metric", metric_to_test, threshold)
+    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin(environment, "gauge-metric", metric_to_test, threshold)
     K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
     # TODO: Check for daemon-set rollout, node-condition

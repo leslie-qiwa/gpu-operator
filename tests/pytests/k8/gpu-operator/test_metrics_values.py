@@ -86,7 +86,7 @@ def deviceconfig_install(gpu_cluster, images, gpu_operator_install, environment)
     Logger.debug(f"Configmap cleanup: ret_code:{ret_code}")
     # ignore ret_code
     ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,
-                                                                   config_map_name, configmap_file)
+                                                                   config_map_name, configmap_file, "config.json")
     test_config = {
             'metadata.namespace' : environment.gpu_operator_namespace,
             'driver.enable' : True,

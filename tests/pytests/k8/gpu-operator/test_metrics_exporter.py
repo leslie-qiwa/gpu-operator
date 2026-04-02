@@ -558,8 +558,7 @@ def test_exporter_nodeport_exp_config(request, gpu_cluster, deviceconfig_install
         Logger.debug(f"Result of configmap delete operation, ret_code:{ret_code}, ret_stdout: {ret_stdout.strip()}, err: {ret_stderr.strip()}")
         # ignore ret_code
         ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,
-                                                                       exp_config_name,
-                                                                       configmap_file)
+                                                                       exp_config_name, configmap_file, "config.json")
         K8Helper.triage(environment, ret_code == 0,
                         f"Failed to create configmap {exp_config_name} for {configmap_file}, err: {ret_stderr.strip()}")
         exporter_config_defn[exp_config_name] = (label_subset, metric_subset)
@@ -1729,13 +1728,15 @@ def test_exporter_rbac_mTLS_cert_support(gpu_cluster, deviceconfig_install, envi
     # Delete if there is any previous instance with same name then create configmap client-ca
     ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(environment.gpu_operator_namespace,"client-ca")
     
-    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,"client-ca", ca_crt_path)
+    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,"client-ca",
+                                                                   ca_crt_path, os.path.basename(ca_crt_path))
     K8Helper.triage(environment,ret_code == 0,f"Failed to create configmap client-ca for {ca_crt_path}, err: {ret_stderr.strip()}")
     
     # Delete if there is any previous instance with same name then create configmap prom-server-ca
     ret_code, ret_stdout, ret_stderr = k8_util.k8_delete_configmap(environment.gpu_operator_namespace,"prom-server-ca")
     
-    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,"prom-server-ca", ca_crt_path)
+    ret_code, ret_stdout, ret_stderr = k8_util.k8_create_configmap(environment.gpu_operator_namespace,"prom-server-ca",
+                                                                   ca_crt_path, os.path.basename(ca_crt_path))
     K8Helper.triage(environment,ret_code == 0,f"Failed to create configmap prom-server-ca for {ca_crt_path}, err: {ret_stderr.strip()}")
     
     # RBAC for CN "prometheus-client" to GET /metrics via SAR

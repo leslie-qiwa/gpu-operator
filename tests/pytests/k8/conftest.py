@@ -154,10 +154,10 @@ def gpu_operator_install(gpu_cluster, gpu_operator_release_name, images, environ
 def deploy_npd_daemonset(gpu_cluster, environment):
     global Logger
     Logger.info("Deploy node-problem-detector with default configuration")
-    ret_code, ret_stdout, ret_stderr = npd_util.init_npd_k8(gpu_cluster)
+    ret_code, ret_stdout, ret_stderr = npd_util.init_npd_k8(gpu_cluster, environment)
     K8Helper.triage(environment, (ret_code == 0), f"Failed to deploy npd daemon-set, error: {ret_stderr}")
     yield
     Logger.info("Cleanup node-problem-detector")
-    npd_util.fini_npd_k8(gpu_cluster)
+    npd_util.fini_npd_k8(gpu_cluster, environment)
     return
 

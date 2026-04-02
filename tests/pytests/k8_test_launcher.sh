@@ -132,7 +132,11 @@ function launch_pytest() {
     fi
     echo "Running test with cmd-opt ${CMD_OPT}"
     export PYTHONIOENCODING=utf-8
-    pytest ${test_sel} -m "not upgrade" --log-file=logs/${DEPLOYMENT}_test_run.log \
+    # Exclude upgrade test directories from collection during sanity runs
+    # --ignore prevents pytest from collecting upgrade tests entirely
+    pytest ${test_sel} --ignore=${DEPLOYMENT}/gpu-operator/upgrade \
+        --ignore=${DEPLOYMENT}/exporter/upgrade \
+        --log-file=logs/${DEPLOYMENT}_test_run.log \
         --junit-xml=${xml_file} --deployment ${DEPLOYMENT} ${CMD_OPT} \
         --html ${html_file}
     ret=$?
