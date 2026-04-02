@@ -49,8 +49,8 @@
             "amdgpu-driver-version" : "6.16.13"
         },
         {
-            "rocm-version" : "31.10",
-            "amdgpu-driver-version" : "6.18.4"
+            "rocm-version" : "30.30.1",
+            "amdgpu-driver-version" : "6.16.13"
         }
     ]
 }
