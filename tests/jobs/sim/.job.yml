@@ -1,0 +1,41 @@
+---
+version: 2.0
+targets:
+  operator-e2e-sim:
+    commands: ["sh", "-cx",
+      "cd ci-internal && ./setup_e2e.sh;
+      cd ../ &&
+      SIM_ENABLE=1 make all &&
+      SIM_ENABLE=1 make docker-push &&
+      helm repo add jetstack https://charts.jetstack.io --force-update &&
+      helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.15.1 --set crds.enabled=true &&
+      SIM_ENABLE=1 SKIP_INSTALL_DEFAULT_CR=1 make helm-install &&
+      sleep 60 && kubectl get pods -A | grep amd &&
+      cd ci-internal && ./create_secret.sh && cd ../ &&
+      sleep 60 && kubectl get pods -A | grep amd &&
+      ci-internal/run_e2e.sh || E2E_FAILED=1;
+      kubectl get pods -A | grep amd &&
+      make helm-uninstall &&
+      make helm-e2e || HELM_E2E_FAILED=1;
+      [ -z \"$E2E_FAILED\" ] && [ -z \"$HELM_E2E_FAILED\" ]"]
+    owners: ["email:sajmera@amd.com"]
+    area:
+    sub-area:
+    feature:
+    repo-dependencies:
+      /ws/builder/kernel-module-management:
+        repository: https://github.com/pensando/kernel-module-management
+        reference: 3c4df0af409cecd65e006e63908611703fb03748
+image:
+  bind_dir: "/gpu-operator"
+  work_dir: "/gpu-operator"
+
+logfiles:
+  - /gpu-operator/techsupport.tgz
+  - /gpu-operator/e2e-artifacts.tgz
+
+queue_name: ubuntu2204
+submodules: {}
+host_mounts:
+  "/sys/module": "/sys/module"
+  "/lib/modules": "/lib/modules"
