@@ -17,7 +17,7 @@ builds:
     repo-dependencies:
       /ws/builder/kernel-module-management:
         repository: https://github.com/pensando/kernel-module-management
-        reference: 3c4df0af409cecd65e006e63908611703fb03748
+        reference: 7de26914947409516d095e89fc4e15c3170b259d
 
   build-gpu-operator-k8s:
     commands: ["sh", "-c", "cd /usr/src/github.com/pensando/gpu-operator && \
@@ -29,7 +29,7 @@ builds:
     repo-dependencies:
       /ws/builder/kernel-module-management:
         repository: https://github.com/pensando/kernel-module-management
-        reference: 3c4df0af409cecd65e006e63908611703fb03748
+        reference: 7de26914947409516d095e89fc4e15c3170b259d
 
   build-external-device-metrics-exporter:
     commands: ["sh", "-c", "export CI_USE_SANITY_BUILD=1 && mkdir -p /device-metrics-exporter &&

@@ -25,7 +25,7 @@ targets:
     repo-dependencies:
       /ws/builder/kernel-module-management:
         repository: https://github.com/pensando/kernel-module-management
-        reference: 3c4df0af409cecd65e006e63908611703fb03748
+        reference: 7de26914947409516d095e89fc4e15c3170b259d
 image:
   bind_dir: "/gpu-operator"
   work_dir: "/gpu-operator"
