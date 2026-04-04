@@ -26,9 +26,57 @@ from lib import common
 import lib.helm_util as helm_util
 import lib.k8_util as k8_util
 import lib.dra_util as dra_util
+import lib.spec_util as spec_util
 from lib.util import K8Helper
 
 Logger = logging.getLogger("k8.dra-driver.conftest")
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """
+    Reorder DRA driver tests to ensure proper execution order:
+    1. Install tests run first (setup)
+    2. Other tests run in the middle
+    3. Uninstall tests run last (cleanup)
+    """
+    # Separate tests into categories
+    install_tests = []
+    uninstall_tests = []
+    other_tests = []
+
+    for item in items:
+        # Check if this is a DRA driver test (only reorder tests in this directory)
+        if "dra-driver" not in item.nodeid:
+            other_tests.append(item)
+            continue
+
+        # Install test should run first
+        if "test_dra_driver_install" in item.nodeid and "uninstall" not in item.nodeid:
+            install_tests.append(item)
+        # Uninstall test should run last
+        elif "test_dra_driver_uninstall" in item.nodeid:
+            uninstall_tests.append(item)
+        # All other tests in the middle
+        else:
+            other_tests.append(item)
+
+    # Reorder: install first, then others, then uninstall last
+    items[:] = install_tests + other_tests + uninstall_tests
+
+    # Log the reordering for debugging
+    if install_tests or uninstall_tests:
+        Logger.info("=" * 70)
+        Logger.info("DRA driver test execution order:")
+        Logger.info("=" * 70)
+        if install_tests:
+            Logger.info(f"  FIRST: {[item.name for item in install_tests]}")
+        if other_tests:
+            Logger.info(
+                f"  MIDDLE: {len([i for i in other_tests if 'dra-driver' in i.nodeid])} other DRA tests"
+            )
+        if uninstall_tests:
+            Logger.info(f"  LAST: {[item.name for item in uninstall_tests]}")
+        Logger.info("=" * 70)
 
 
 @pytest.fixture(scope="session")
@@ -47,7 +95,7 @@ def dra_api_version(environment):
     global Logger
 
     # Check if already cached in environment
-    if hasattr(environment, 'dra_api_version'):
+    if hasattr(environment, "dra_api_version"):
         Logger.debug(f"Using cached DRA API version: {environment.dra_api_version}")
         return environment.dra_api_version
 
@@ -92,7 +140,9 @@ def dra_api_version(environment):
         # Verify feature gate is enabled on control plane components
         Logger.info("Verifying DynamicResourceAllocation feature gate is enabled...")
         components = ["kube-apiserver", "kube-scheduler", "kube-controller-manager"]
-        all_enabled, status, gate_error = dra_util.check_feature_gate_enabled(components)
+        all_enabled, status, gate_error = dra_util.check_feature_gate_enabled(
+            components
+        )
 
         if not all_enabled:
             pytest.fail(
@@ -114,7 +164,7 @@ def dra_api_version(environment):
         )
 
     # Cache in environment for reuse
-    setattr(environment, 'dra_api_version', api_version)
+    setattr(environment, "dra_api_version", api_version)
     Logger.info(f"DRA API version validated and cached: {api_version}")
 
     return api_version
@@ -133,7 +183,12 @@ def dra_driver_namespace(environment):
 
 @pytest.fixture(scope="session", autouse=True)
 def init_dra_testbed(
-    request, gpu_cluster, dra_driver_release_name, dra_driver_namespace, environment, dra_api_version
+    request,
+    gpu_cluster,
+    dra_driver_release_name,
+    dra_driver_namespace,
+    environment,
+    dra_api_version,
 ):
     """Initialize DRA test environment"""
     global Logger
@@ -146,7 +201,9 @@ def init_dra_testbed(
         if helm_util.is_helm_chart_deployed(
             gpu_cluster, dra_driver_release_name, dra_driver_namespace
         ):
-            Logger.warning(f"helm {dra_driver_release_name} is already deployed - cleanup")
+            Logger.warning(
+                f"helm {dra_driver_release_name} is already deployed - cleanup"
+            )
             ret_code, ret_stdout, ret_stderr = helm_util.helm_uninstall(
                 gpu_cluster, dra_driver_release_name, dra_driver_namespace
             )
@@ -158,8 +215,20 @@ def init_dra_testbed(
         # Clean up any remaining ResourceClaims
         dra_util.cleanup_resource_claims(dra_driver_namespace)
 
-    Logger.info("Cleanup before starting DRA test session")
-    _cleanup_steps()
+    # Check if user wants to skip cleanup (useful when running individual tests against existing installation)
+    skip_cleanup = os.getenv("DRA_SKIP_CLEANUP", "false").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
+
+    if skip_cleanup:
+        Logger.info(
+            "DRA_SKIP_CLEANUP=true - Skipping cleanup, will use existing DRA driver installation"
+        )
+    else:
+        Logger.info("Cleanup before starting DRA test session")
+        _cleanup_steps()
 
     # Init k8 cluster for DRA testing
     k8_util.k8_init_cluster(gpu_cluster, [dra_driver_namespace])
@@ -172,7 +241,9 @@ def init_dra_testbed(
     # inspection after running individual tests. Cleanup will happen via:
     # 1. Session setup (above) - cleans before each test session starts
     # 2. test_dra_driver_uninstall test - explicit cleanup when that test runs
-    Logger.info("DRA test session complete (no auto-cleanup, run test_dra_driver_uninstall to cleanup)")
+    Logger.info(
+        "DRA test session complete (no auto-cleanup, run test_dra_driver_uninstall to cleanup)"
+    )
     return
 
 
@@ -288,9 +359,7 @@ def dra_driver_install(
     # Check for orphaned DeviceClass resources from previous installations
     # kubectl equivalent: kubectl get deviceclasses.resource.k8s.io
     ret_code, device_classes, err = k8_util.k8_get_custom_resource_objects(
-        group="resource.k8s.io",
-        version=dra_api_version,
-        plural="deviceclasses"
+        group="resource.k8s.io", version=dra_api_version, plural="deviceclasses"
     )
 
     if ret_code != 0:

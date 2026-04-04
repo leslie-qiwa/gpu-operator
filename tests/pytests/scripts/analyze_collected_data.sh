@@ -131,9 +131,56 @@ done | sort -u | while read device_id; do
 done
 echo
 
-# 6. Node details
+# 6. Partition Mapping Details (XCP + KFD correlation)
 echo "==================================================================="
-echo "6. Node Details"
+echo "6. Partition Mapping Details (XCP + KFD)"
+echo "==================================================================="
+for f in $DATA_DIR/*.json; do
+    NODE=$(basename $f -gpu-data.json)
+    echo "Node: $NODE"
+
+    # Check if hardware data has partition info
+    PARTITION_COUNT=$(jq '[.hardware.gpus[].partitions[]] | length' $f 2>/dev/null)
+    if [ "$PARTITION_COUNT" = "null" ] || [ -z "$PARTITION_COUNT" ]; then
+        echo "  No partition data collected"
+        echo
+        continue
+    fi
+
+    # Iterate through each GPU
+    GPU_COUNT=$(jq '.hardware.gpus | length' $f)
+    for ((i=0; i<GPU_COUNT; i++)); do
+        PCI=$(jq -r ".hardware.gpus[$i].pci_address_full // .hardware.gpus[$i].pci_address" $f)
+        COMPUTE=$(jq -r ".hardware.gpus[$i].current_compute_partition // empty" $f)
+        MEMORY=$(jq -r ".hardware.gpus[$i].current_memory_partition // empty" $f)
+        PART_COUNT=$(jq ".hardware.gpus[$i].partitions | length" $f)
+
+        echo "  GPU $i (PCI: $PCI)"
+        if [ -n "$COMPUTE" ] && [ -n "$MEMORY" ]; then
+            echo "    Profile: ${COMPUTE}_${MEMORY}"
+            echo "    Partitions: $PART_COUNT"
+
+            # Show partition details
+            if [ "$PART_COUNT" -gt 0 ]; then
+                for ((j=0; j<PART_COUNT; j++)); do
+                    XCP_NAME=$(jq -r ".hardware.gpus[$i].partitions[$j].xcp_name // \"N/A\"" $f)
+                    KFD_NODE=$(jq -r ".hardware.gpus[$i].partitions[$j].kfd_node_id // \"N/A\"" $f)
+                    GPU_ID=$(jq -r ".hardware.gpus[$i].partitions[$j].kfd_gpu_id // \"N/A\"" $f)
+                    SIMD=$(jq -r ".hardware.gpus[$i].partitions[$j].kfd_simd_count // \"N/A\"" $f)
+                    echo "      [$((j+1))] $XCP_NAME → KFD node $KFD_NODE (GPU ID: $GPU_ID, SIMD: $SIMD)"
+                done
+            fi
+        else
+            echo "    Profile: None (full GPU)"
+            echo "    Partitions: 0"
+        fi
+        echo
+    done
+done
+
+# 7. Node details
+echo "==================================================================="
+echo "7. Node Details"
 echo "==================================================================="
 for f in $DATA_DIR/*.json; do
     NODE=$(jq -r '.node.name' $f)
@@ -157,6 +204,12 @@ echo "  jq -r '.rocm.rocm_smi.output' $DATA_DIR/<node-name>-gpu-data.json"
 echo
 echo "To view raw AMD SMI output:"
 echo "  jq -r '.rocm.amd_smi.output' $DATA_DIR/<node-name>-gpu-data.json"
+echo
+echo "To view full partition details for a specific GPU:"
+echo "  jq '.hardware.gpus[0].partitions' $DATA_DIR/<node-name>-gpu-data.json"
+echo
+echo "To compare hardware partitions with DRA advertised partitions:"
+echo "  jq '{hw: [.hardware.gpus[].partitions[] | .xcp_name], dra: [.dra_advertised.partitions[].name]}' $DATA_DIR/<node-name>-gpu-data.json"
 echo
 echo "For more analysis options, see: scripts/README_COLLECT_NODE_DATA.md"
 echo

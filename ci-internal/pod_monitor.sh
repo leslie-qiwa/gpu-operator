@@ -9,7 +9,7 @@
 #   ./pod_monitor.sh restart - Restart pod monitor
 #
 # Environment variables:
-#   POD_MONITOR_NAMESPACES - Comma-separated namespaces (default: kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu)
+#   POD_MONITOR_NAMESPACES - Comma-separated namespaces (default: kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu)
 #   POD_MONITOR_PATTERN    - Pod name pattern to filter
 #   POD_MONITOR_FORMAT     - Output format: text or json (default: text)
 #   POD_MONITOR_LOG        - Log file path (default: /tmp/pod-monitor-<timestamp>.log)
@@ -24,7 +24,7 @@ PID_FILE="/tmp/pod_monitor.pid"
 LOG_FILE_TRACKER="/tmp/pod_monitor.logfile"
 
 # Default configuration
-NAMESPACES="${POD_MONITOR_NAMESPACES:-kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu}"
+NAMESPACES="${POD_MONITOR_NAMESPACES:-kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu}"
 PATTERN="${POD_MONITOR_PATTERN:-}"
 FORMAT="${POD_MONITOR_FORMAT:-text}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
@@ -197,7 +197,7 @@ case "${1:-}" in
         echo "Usage: $0 {start|stop|status|restart}"
         echo ""
         echo "Environment variables:"
-        echo "  POD_MONITOR_NAMESPACES - Comma-separated namespaces (default: kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu)"
+        echo "  POD_MONITOR_NAMESPACES - Comma-separated namespaces (default: kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu)"
         echo "  POD_MONITOR_PATTERN    - Pod name pattern to filter"
         echo "  POD_MONITOR_FORMAT     - Output format: text or json (default: text)"
         echo "  POD_MONITOR_LOG        - Log file path (default: /tmp/pod-monitor-<timestamp>.log)"

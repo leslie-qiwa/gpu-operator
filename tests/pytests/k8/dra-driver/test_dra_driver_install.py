@@ -198,6 +198,7 @@ def test_dra_driver_install(
     gpu_cluster,
     dra_driver_release_name,
     dra_driver_namespace,
+    amdgpu_driver_install,
     dra_driver_install,
     environment,
 ):
@@ -330,6 +331,7 @@ def test_dra_driver_uninstall(
     gpu_cluster,
     dra_driver_release_name,
     dra_driver_namespace,
+    amdgpu_driver_install,
     dra_driver_install,
     images,
     environment,

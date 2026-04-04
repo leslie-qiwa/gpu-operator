@@ -169,9 +169,7 @@ e2e-targets:
     commands: [
         "/bin/sh",
         "-c",
-        "cat /warmd.json && cd /gpu-operator/tests/pytests && \
-         /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app dra-driver \
-         --testbed /warmd.json --amdgpu-driver default-deviceconfig"
+        "cat /warmd.json && cd /gpu-operator/tests/pytests && /gpu-operator/ci-internal/run_sanity.sh --deployment k8 --app dra-driver --testbed /warmd.json --amdgpu-driver default-deviceconfig"
     ]
     owners: ["email:leslie.wang@amd.com"]
     tcp-ports: [5000]

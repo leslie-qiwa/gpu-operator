@@ -313,6 +313,57 @@ def collect_dra_devices(node_name: str) -> Dict:
     return dra_info
 
 
+def print_partition_mapping(hw_info, node_name):
+    """Pretty print the partition mapping to stderr (so it doesn't interfere with JSON output)"""
+    import sys
+
+    def eprint(*args, **kwargs):
+        """Print to stderr"""
+        print(*args, file=sys.stderr, **kwargs)
+
+    eprint("\n" + "=" * 80)
+    eprint(f"GPU Partition Mapping for Node: {node_name}")
+    eprint("=" * 80)
+
+    for gpu in hw_info.get("gpus", []):
+        pci_addr = gpu.get("pci_address_full", gpu.get("pci_address", "unknown"))
+        eprint(f"\n- GPU at PCI {pci_addr}")
+        eprint(f"   Device ID: {gpu.get('device_id', 'N/A')}")
+        eprint(f"   GPU Series: {gpu.get('gpu_series', 'N/A')}")
+        eprint(f"   Product: {gpu.get('product_name', 'N/A')}")
+        eprint(f"   Card Index: {gpu.get('cardIndex', 'N/A')}")
+        eprint(f"   Render Index: {gpu.get('renderIndex', 'N/A')}")
+
+        compute_part = gpu.get("current_compute_partition", "").strip()
+        memory_part = gpu.get("current_memory_partition", "").strip()
+
+        if compute_part and memory_part:
+            profile = f"{compute_part}_{memory_part}"
+            eprint(f"   Partition Profile: {profile}")
+        else:
+            eprint(f"   Partition Profile: None (full GPU)")
+
+        partitions = gpu.get("partitions", [])
+        if partitions:
+            eprint(f"\n   Partitions ({len(partitions)}):")
+            for i, part in enumerate(partitions, 1):
+                eprint(f"\n   [{i}] Partition Details:")
+                eprint(f"       XCP Index: {part.get('xcp_index', 'N/A')}")
+                eprint(f"       XCP Name: {part.get('xcp_name', 'N/A')}")
+                eprint(f"       Parent PCI: {part.get('parent_pci', 'N/A')}")
+                eprint(f"       KFD Node ID: {part.get('kfd_node_id', 'N/A')}")
+                eprint(f"       KFD GPU ID: {part.get('kfd_gpu_id', 'N/A')}")
+                eprint(f"       SIMD Count: {part.get('kfd_simd_count', 'N/A')}")
+                eprint(f"       NUMA Node: {part.get('kfd_numa_node_id', 'N/A')}")
+                eprint(f"       Memory Banks: {part.get('kfd_mem_banks_count', 'N/A')}")
+        else:
+            eprint(f"\n   No partitions (operating as full GPU)")
+
+        eprint()
+
+    eprint("=" * 80)
+
+
 def get_node_info(node_name: str) -> Dict:
     """
     Get basic node information using kubectl.
@@ -383,8 +434,11 @@ Examples:
   # Save to file
   %(prog)s worker-node-1 --output node-data.json
 
-  # Pretty print
+  # Pretty print JSON
   %(prog)s worker-node-1 --pretty
+
+  # Show detailed partition mapping (XCP + KFD correlation)
+  %(prog)s worker-node-1 --show-partition-mapping --output node-data.json
 
   # Only collect specific data
   %(prog)s worker-node-1 --skip-rocm --skip-partition
@@ -438,6 +492,12 @@ Examples:
         action="store_true",
     )
 
+    parser.add_argument(
+        "--show-partition-mapping",
+        help="Display detailed partition mapping (XCP, KFD correlation)",
+        action="store_true",
+    )
+
     args = parser.parse_args()
 
     # Configure logging
@@ -471,6 +531,10 @@ Examples:
 
     if not args.skip_hardware:
         data["hardware"] = collect_hardware_info(k8_cluster, args.node_name)
+
+        # Show partition mapping if requested
+        if args.show_partition_mapping:
+            print_partition_mapping(data["hardware"], args.node_name)
     else:
         logger.info("[1/4] Skipping hardware info")
 
@@ -491,8 +555,27 @@ Examples:
 
     # Add summary
     logger.debug("Building summary")
+
+    # Calculate hardware partition counts from new XCP/KFD correlation
+    hw_partition_count = 0
+    xcp_device_count = 0
+    kfd_node_count = 0
+    for gpu in data.get("hardware", {}).get("gpus", []):
+        partitions = gpu.get("partitions", [])
+        hw_partition_count += len(partitions)
+        xcp_device_count += sum(
+            1
+            for p in partitions
+            if p.get("xcp_index") is not None
+            or str(p.get("xcp_name", "")).startswith("amdgpu_xcp_")
+        )
+        kfd_node_count += sum(1 for p in partitions if p.get("kfd_node_id"))
+
     data["summary"] = {
         "hardware_gpu_count": len(data.get("hardware", {}).get("gpus", [])),
+        "hardware_partition_count": hw_partition_count,  # From XCP/KFD correlation
+        "xcp_device_count": xcp_device_count,
+        "kfd_node_count": kfd_node_count,
         "dra_full_gpu_count": len(data.get("dra_advertised", {}).get("full_gpus", [])),
         "dra_partition_count": len(
             data.get("dra_advertised", {}).get("partitions", [])
@@ -511,6 +594,7 @@ Examples:
     logger.info("")
     logger.info("Summary:")
     logger.info(f"  Hardware GPUs: {data['summary']['hardware_gpu_count']}")
+    logger.info(f"  Hardware Partitions: {data['summary']['hardware_partition_count']} (XCP: {data['summary']['xcp_device_count']}, KFD: {data['summary']['kfd_node_count']})")
     logger.info(f"  DRA Full GPUs: {data['summary']['dra_full_gpu_count']}")
     logger.info(f"  DRA Partitions: {data['summary']['dra_partition_count']}")
     logger.info(f"  Partition Profiles: {data['summary']['partition_profiles']}")

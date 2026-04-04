@@ -105,7 +105,7 @@ Run the pod monitor directly (without the control script):
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `POD_MONITOR_NAMESPACES` | Comma-separated namespace list | `kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu` |
+| `POD_MONITOR_NAMESPACES` | Comma-separated namespace list | `kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu` |
 | `POD_MONITOR_PATTERN` | Pod name filter (substring match) | _(all pods)_ |
 | `POD_MONITOR_FORMAT` | Output format: `text` or `json` | `text` |
 | `POD_MONITOR_LOG` | Log file path | `/tmp/pod-monitor-<timestamp>.log` |
@@ -117,7 +117,7 @@ Run the pod monitor directly (without the control script):
 Human-readable output:
 
 ```
-2026-03-24 18:30:15 [INFO] Starting pod monitor for namespaces: kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu
+2026-03-24 18:30:15 [INFO] Starting pod monitor for namespaces: kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu
 2026-03-24 18:30:15 [INFO] New Pod detected: 'test-deviceconfig-device-plugin-8f7px' in gpu-operator
 2026-03-24 18:30:20 [INFO] Pod 'test-deviceconfig-device-plugin-8f7px' (gpu-operator): Pending → Running | Ready: 1/1 | Restarts: 0
 2026-03-24 18:30:25 [INFO] Pod 'test-deviceconfig-metrics-exporter-27gq9' (gpu-operator): ContainerCreating → Running | Ready: 2/2 | Restarts: 0
@@ -216,7 +216,7 @@ Printed to stdout and logged to the main log file:
 POD MONITOR SUMMARY
 ======================================================================
 Duration:          0:15:23.456789
-Namespaces:        kube-amd-gpu,kube-amd-exporter,default,openshift-amd-gpu
+Namespaces:        kube-amd-gpu,kube-amd-gpu-dra,kube-amd-exporter,default,openshift-amd-gpu
 Total pods:        15
 State changes:     42
 
@@ -250,7 +250,7 @@ Saved to `<logfile>.final.json` (e.g., `/tmp/pod-monitor-20260324_183015.final.j
     "start_time": "2026-03-24T18:30:15.123456",
     "end_time": "2026-03-24T18:45:38.654321",
     "duration_seconds": 923.53,
-    "namespaces": ["kube-amd-gpu", "kube-amd-exporter", "default", "openshift-amd-gpu"],
+    "namespaces": ["kube-amd-gpu", "kube-amd-gpu-dra", "kube-amd-exporter", "default", "openshift-amd-gpu"],
     "pod_pattern": null,
     "total_pods": 15,
     "total_events": 42

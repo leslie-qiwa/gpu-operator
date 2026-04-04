@@ -358,14 +358,26 @@ def environment(request):
 
     # Tech-support tool
     setattr(tenv, 'tech_support_tool', None)
+    tech_support_path = None
+
+    # Use user-provided tool if specified
     if request.config.option.tech_support_tool:
         if os.path.exists(request.config.option.tech_support_tool):
-            tst_info = {
-                "tool" : request.config.option.tech_support_tool,
-                "args" : [],
-            }
-            setattr(tenv, 'tech_support_tool', tst_info)
-            os.makedirs(os.path.join(tenv.logdir, "tech-support"), exist_ok=True)
+            tech_support_path = request.config.option.tech_support_tool
+    else:
+        # Fall back to default tech-support script
+        default_script = os.path.join(os.path.dirname(__file__), "scripts", "default-tech-support.sh")
+        if os.path.exists(default_script):
+            tech_support_path = default_script
+            Logger.info(f"Using default tech-support script: {default_script}")
+
+    if tech_support_path:
+        tst_info = {
+            "tool": tech_support_path,
+            "args": [],
+        }
+        setattr(tenv, 'tech_support_tool', tst_info)
+        os.makedirs(os.path.join(tenv.logdir, "tech-support"), exist_ok=True)
 
     # Workload Template
     setattr(tenv, 'default_workload', request.config.option.workload_selection)
