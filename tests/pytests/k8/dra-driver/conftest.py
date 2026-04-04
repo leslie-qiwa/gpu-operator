@@ -87,6 +87,8 @@ def dra_api_version(environment):
     This fixture runs once per test session and enforces version-specific requirements:
     - K8s 1.34+: Requires DRA v1 API (GA, enabled by default)
     - K8s 1.32-1.33: Requires DRA v1beta1 API with DynamicResourceAllocation feature gate enabled
+      * On standard K8s: Validates feature gate in control plane component pods
+      * On OpenShift: Skips feature gate check (control plane managed differently)
     - K8s < 1.32: Skips tests (DRA not supported)
 
     Returns:
@@ -138,24 +140,31 @@ def dra_api_version(environment):
             )
 
         # Verify feature gate is enabled on control plane components
-        Logger.info("Verifying DynamicResourceAllocation feature gate is enabled...")
-        components = ["kube-apiserver", "kube-scheduler", "kube-controller-manager"]
-        all_enabled, status, gate_error = dra_util.check_feature_gate_enabled(
-            components
-        )
-
-        if not all_enabled:
-            pytest.fail(
-                f"K8s {major}.{minor} with DRA v1beta1 requires DynamicResourceAllocation feature gate enabled. "
-                f"Feature gate check failed: {gate_error}. Component status: {status}. "
-                f"Enable with --feature-gates=DynamicResourceAllocation=true on kube-apiserver, "
-                f"kube-scheduler, kube-controller-manager, and kubelet. "
-                f"Also ensure --runtime-config=resource.k8s.io/v1beta1=true on kube-apiserver."
+        # Skip this check on OpenShift since control plane pods are not visible in kube-system
+        if environment.deployment_mode == "openshift":
+            Logger.info(
+                f"✓ K8s {major}.{minor} (OpenShift) has DRA v1beta1 API available. "
+                f"Skipping feature gate check (control plane managed by OpenShift)."
+            )
+        else:
+            Logger.info("Verifying DynamicResourceAllocation feature gate is enabled...")
+            components = ["kube-apiserver", "kube-scheduler", "kube-controller-manager"]
+            all_enabled, status, gate_error = dra_util.check_feature_gate_enabled(
+                components
             )
 
-        Logger.info(
-            f"✓ K8s {major}.{minor} has DRA v1beta1 API with feature gate enabled on: {list(status.keys())}"
-        )
+            if not all_enabled:
+                pytest.fail(
+                    f"K8s {major}.{minor} with DRA v1beta1 requires DynamicResourceAllocation feature gate enabled. "
+                    f"Feature gate check failed: {gate_error}. Component status: {status}. "
+                    f"Enable with --feature-gates=DynamicResourceAllocation=true on kube-apiserver, "
+                    f"kube-scheduler, kube-controller-manager, and kubelet. "
+                    f"Also ensure --runtime-config=resource.k8s.io/v1beta1=true on kube-apiserver."
+                )
+
+            Logger.info(
+                f"✓ K8s {major}.{minor} has DRA v1beta1 API with feature gate enabled on: {list(status.keys())}"
+            )
 
     # K8s < 1.32: Skip tests (DRA not supported)
     else:

@@ -69,7 +69,7 @@ images:
     dra-driver-image:
       key         : draDriver.image
       location    : container://docker.io/amdpsdo/k8s-gpu-dra-driver
-      version     : develop-2
+      version     : develop-4
       kind        : container
       secret      : docker-amdpsdo-auth
 
@@ -246,7 +246,7 @@ images:
     dra-driver-image:
       key         : draDriver.image
       location    : container://docker.io/amdpsdo/k8s-gpu-dra-driver
-      version     : develop-2
+      version     : develop-4
       kind        : container
       secret      : docker-amdpsdo-auth
 

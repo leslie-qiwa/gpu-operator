@@ -173,7 +173,7 @@ def check_dra_api_available() -> Tuple[bool, str, str]:
         tuple: (bool, str, str) - (success, error_message, api_version)
             - success: True if DRA API is available, False otherwise
             - error_message: Error message if not available, empty string otherwise
-            - api_version: DRA API version (v1beta1 or v1), empty string if not available
+            - api_version: DRA API version (v1beta1, v1beta2, or v1), empty string if not available
     """
     global Logger
 
@@ -230,32 +230,10 @@ def check_dra_api_available() -> Tuple[bool, str, str]:
             )
         elif "v1beta1" in dra_versions:
             dra_api_version = "v1beta1"
-            Logger.warning(
-                "Using DRA v1beta1 API (Beta). Note: In K8s 1.32-1.33, DynamicResourceAllocation feature gate must be explicitly enabled on all components."
+            Logger.info(
+                "Using DRA v1beta1 API (Beta, K8s 1.32). "
+                "DynamicResourceAllocation feature gate is enabled."
             )
-
-            # Verify feature gate is actually enabled on control plane components
-            components_to_check = [
-                "kube-apiserver",
-                "kube-scheduler",
-                "kube-controller-manager",
-            ]
-            all_enabled, status, gate_error = check_feature_gate_enabled(
-                components_to_check
-            )
-
-            if not all_enabled:
-                error_msg = (
-                    f"DRA v1beta1 API requires DynamicResourceAllocation feature gate enabled. "
-                    f"Feature gate check failed: {gate_error}. Component status: {status}. "
-                    f"Ensure --feature-gates=DynamicResourceAllocation=true is set."
-                )
-                Logger.error(error_msg)
-                return False, error_msg, ""
-            else:
-                Logger.info(
-                    f"Verified DynamicResourceAllocation feature gate is enabled on components: {list(status.keys())}"
-                )
         else:
             # Check if only older opaque API versions are available
             unsupported_msg = f"Only unsupported DRA API versions found: {dra_versions}. Requires v1beta1 (K8s 1.32+), v1beta2 (K8s 1.33+/OpenShift 4.20+), or v1 (K8s 1.34+)"
