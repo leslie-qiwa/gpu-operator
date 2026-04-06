@@ -124,15 +124,16 @@ def _wait_and_check_label(node_name, label_key, timeout=120):
         time.sleep(5)
     return False
     
-@pytest.fixture(autouse=True, scope="module")
-def skip_module(environment):
-    if environment.deployment_mode == "openshift":
-        pytest.skip(f"Skipping ANR deployment testcases for {environment.deployment_mode}")
-    return
-
 @pytest.fixture(scope="module")
-def deviceconfig_install(gpu_cluster, images, gpu_operator_install, environment, request):
+def deviceconfig_install(gpu_cluster, images, gpu_operator_install,
+                        argo_workflow_setup, environment, request):
     global Logger
+
+    # Argo Workflows is managed differently on vanilla K8s vs OpenShift
+    # - Vanilla K8s: GPU Operator installs Argo automatically (dummy fixture)
+    # - OpenShift: argo_workflow_setup fixture installs and manages Argo
+    argo_info = argo_workflow_setup
+    Logger.info(f"Using Argo Workflows - managed by: {argo_info.get('managed_by', 'fixture')}")
 
     # cleanup - remove any deviceconfigs
     def _deviceconfig_cleanup():

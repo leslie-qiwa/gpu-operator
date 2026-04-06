@@ -161,3 +161,41 @@ def deploy_npd_daemonset(gpu_cluster, environment):
     npd_util.fini_npd_k8(gpu_cluster, environment)
     return
 
+@pytest.fixture(scope="module")
+def argo_workflow_setup(environment):
+    """
+    Dummy Argo Workflows fixture for vanilla Kubernetes.
+
+    On vanilla Kubernetes, the GPU Operator installs Argo Workflows automatically
+    when ANR (Auto Node Remediation) is enabled via Helm chart installation.
+
+    This fixture exists as a no-op placeholder to maintain test compatibility
+    between vanilla Kubernetes and OpenShift environments.
+
+    For OpenShift (which requires manual Argo installation), the real implementation
+    is in tests/pytests/openshift/conftest.py.
+
+    Returns:
+        dict: Information indicating Argo is managed by GPU Operator
+            - namespace: GPU Operator namespace (where Argo controller runs)
+            - installed_by_fixture: False (GPU Operator manages it)
+            - managed_by: "gpu-operator"
+    """
+    global Logger
+
+    Logger.info("Using dummy argo_workflow_setup fixture - GPU Operator manages Argo on vanilla K8s")
+
+    # Return info matching the OpenShift fixture interface
+    argo_info = {
+        "namespace": environment.gpu_operator_namespace,
+        "installed_by_fixture": False,
+        "managed_by": "gpu-operator",
+        "platform": "vanilla-kubernetes"
+    }
+
+    yield argo_info
+
+    # No cleanup needed - GPU Operator manages Argo lifecycle
+    Logger.debug("No Argo cleanup needed - managed by GPU Operator")
+    return
+

@@ -25,6 +25,7 @@ from lib import common
 import lib.k8_util as k8_util
 import lib.olm_util as olm_util
 import lib.npd_util as npd_util
+import lib.autoremediation_util as anr_util
 from lib.util import K8Helper
 
 Logger = logging.getLogger("k8.conftest")
@@ -208,4 +209,142 @@ def deploy_npd_daemonset(gpu_cluster, environment):
     Logger.info("Cleanup node-problem-detector")
     npd_util.fini_npd_oc(gpu_cluster, environment)
     return
+
+@pytest.fixture(scope="module")
+def argo_workflow_setup(gpu_cluster, environment, request):
+    """
+    Setup Argo Workflows for OpenShift ANR testing.
+
+    This fixture:
+    1. Checks if Argo is already installed (e.g., via OpenShift AI)
+    2. Installs Argo Workflows (CRDs + controller) if not present
+    3. Verifies installation health
+    4. Cleans up after tests (optional CRD removal)
+
+    Usage in tests:
+        @pytest.fixture(scope="module")
+        def deviceconfig_install(gpu_cluster, images, gpu_operator_install,
+                                argo_workflow_setup, environment, request):
+            # Your deviceconfig setup
+            ...
+
+    Returns:
+        dict: Information about Argo installation
+            - namespace: Argo namespace
+            - installed_by_fixture: True if installed by this fixture
+            - version: Argo version
+    """
+    global Logger
+
+    argo_namespace = "argo-workflow"
+    # Argo Workflows application version (for CRDs from GitHub)
+    # Using v4.0.3 to match documentation: docs/autoremediation/auto-remediation.md
+    argo_git_tag = "v4.0.3"
+    # Argo Workflows Helm chart version (different from app version)
+    # See: https://github.com/argoproj/argo-helm/releases
+    # Chart v0.48.2 includes Argo Workflows v4.0.3
+    chart_version = "0.48.2"
+    installed_by_fixture = False
+
+    # Step 1: Check if Argo is already fully installed (CRDs + controller)
+    Logger.info("Checking for existing Argo Workflows installation")
+    ret_code, info, error = anr_util.check_argo_installation_openshift()
+
+    if ret_code == 0:
+        # Both CRDs and controller are present and healthy
+        Logger.info(f"Argo Workflows already installed and operational: {info}")
+        argo_info = {
+            "namespace": argo_namespace,
+            "installed_by_fixture": False,
+            "git_tag": argo_git_tag,
+            "chart_version": chart_version,
+            "preexisting": True
+        }
+    else:
+        # Either CRDs or controller (or both) are missing
+        Logger.info(f"Argo Workflows not fully operational: {error}")
+
+        # Check if CRDs exist separately to decide what to install
+        ret_code_crds, missing_crds = anr_util.check_argo_crds_exist()
+        install_crds = (ret_code_crds != 0)  # Install CRDs if they're missing
+
+        if install_crds:
+            Logger.info(f"Installing Argo Workflows (git:{argo_git_tag}, chart:{chart_version}) - CRDs + controller")
+        else:
+            Logger.info(f"Argo CRDs exist but controller is missing - installing controller only")
+
+        # Install CRDs and/or controller as needed
+        ret_code, stdout, stderr = anr_util.install_argo_workflows_helm(
+            namespace=argo_namespace,
+            argo_git_tag=argo_git_tag,
+            chart_version=chart_version,
+            install_crds=install_crds  # Only install CRDs if they're missing
+        )
+
+        K8Helper.triage(environment, (ret_code == 0),
+                       f"Failed to install Argo Workflows: {stderr}")
+
+        installed_by_fixture = True
+        Logger.info("Argo Workflows installation completed")
+
+        # Wait for controller to be ready
+        time.sleep(10)
+
+        argo_info = {
+            "namespace": argo_namespace,
+            "installed_by_fixture": True,
+            "git_tag": argo_git_tag,
+            "chart_version": chart_version,
+            "preexisting": False
+        }
+
+    # Step 3: Verify Argo installation
+    Logger.info("Verifying Argo Workflows installation")
+
+    # Check for workflow controller pod
+    controller_pods = [
+        common.PodInfo('workflow-controller', 1, 1),
+    ]
+
+    ret_code, pods = k8_util.k8_get_pods(argo_namespace)
+    if ret_code == 0 and pods:
+        Logger.info(f"Found {len(pods)} pod(s) in Argo namespace")
+        failed_pods = k8_util.k8_check_pod_running(argo_namespace, controller_pods)
+        # Fail fast if controller pods are not ready - tests depend on functional Argo
+        K8Helper.triage(environment, not failed_pods,
+                       f"Argo workflow controller pods are not ready: {failed_pods}")
+    else:
+        # No pods found or failed to get pods
+        K8Helper.triage(environment, False,
+                       f"Failed to find Argo workflow controller pods in namespace {argo_namespace}")
+
+    # Verify CRDs exist
+    ret_code, missing_crds = anr_util.check_argo_crds_exist()
+    K8Helper.triage(environment, (ret_code == 0),
+                   f"Argo CRDs missing after installation: {missing_crds}")
+
+    Logger.info("Argo Workflows setup complete and verified")
+
+    # Register cleanup finalizer BEFORE yield (during setup phase)
+    def _cleanup_argo():
+        if installed_by_fixture:
+            Logger.info("Cleaning up Argo Workflows installed by fixture")
+
+            # Uninstall Argo but keep CRDs for potential reuse
+            # Set remove_crds=True if you want complete cleanup
+            ret_code, stdout, stderr = anr_util.uninstall_argo_workflows_helm(
+                namespace=argo_namespace,
+                remove_crds=False  # Keep CRDs to avoid reinstalling in other tests
+            )
+
+            if ret_code != 0:
+                Logger.warning(f"Failed to uninstall Argo Workflows: {stderr}")
+            else:
+                Logger.info("Argo Workflows cleanup completed")
+        else:
+            Logger.info("Skipping Argo cleanup - was pre-existing")
+
+    request.addfinalizer(_cleanup_argo)
+
+    yield argo_info
 
