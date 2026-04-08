@@ -168,16 +168,16 @@ def check_argo_installation_openshift() -> Tuple[int, str, str]:
         return -1, "", str(e)
 
 
-def install_argo_crds(version: str = "v3.6.5") -> Tuple[int, str, str]:
+def install_argo_crds(version: str = "v4.0.3") -> Tuple[int, str, str]:
     """
     Install Argo Workflows CRDs using Python K8s API.
 
     Downloads CRD manifests from GitHub and applies them using the API client.
     This is the Python equivalent of:
-        kubectl apply --server-side --force-conflicts -k "https://github.com/argoproj/argo-workflows/manifests/base/crds/full?ref=v3.6.5"
+        kubectl apply --server-side --force-conflicts -k "https://github.com/argoproj/argo-workflows/manifests/base/crds/full?ref=v4.0.3"
 
     Args:
-        version: Argo Workflows version (e.g., "v3.6.5", "v3.7.10")
+        version: Argo Workflows version (e.g., "v4.0.3")
 
     Returns:
         Tuple[int, str, str]: (return_code, message, error)
@@ -254,8 +254,8 @@ def install_argo_crds(version: str = "v3.6.5") -> Tuple[int, str, str]:
 
 
 def install_argo_workflows_helm(namespace: str = "argo-workflow",
-                                argo_git_tag: str = "v3.6.5",
-                                chart_version: str = "0.41.1",
+                                argo_git_tag: str = "v4.0.3",
+                                chart_version: str = "1.0.5",
                                 install_crds: bool = True) -> Tuple[int, str, str]:
     """
     Install Argo Workflows using Helm for OpenShift.
@@ -266,8 +266,8 @@ def install_argo_workflows_helm(namespace: str = "argo-workflow",
 
     Args:
         namespace: Namespace to install Argo Workflows
-        argo_git_tag: Git tag for downloading CRDs from GitHub (e.g., "v3.6.5", "v3.7.10")
-        chart_version: Helm chart version for argo/argo-workflows (e.g., "0.41.1", "0.42.0")
+        argo_git_tag: Git tag for downloading CRDs from GitHub (e.g., "v4.0.3")
+        chart_version: Helm chart version for argo/argo-workflows (e.g., "1.0.5")
         install_crds: If True, install CRDs before Helm chart
 
     Returns:
@@ -275,8 +275,8 @@ def install_argo_workflows_helm(namespace: str = "argo-workflow",
 
     Note:
         The argo_git_tag and chart_version use different versioning schemes:
-        - argo_git_tag: Application/Git version (e.g., v3.6.5)
-        - chart_version: Helm chart version (e.g., 0.41.1)
+        - argo_git_tag: Application/Git version (e.g., v4.0.3)
+        - chart_version: Helm chart version (e.g., 1.0.5 for Argo v4.x)
         See https://github.com/argoproj/argo-helm/releases for chart versions
     """
     try:

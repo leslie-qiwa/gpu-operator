@@ -242,8 +242,8 @@ def argo_workflow_setup(gpu_cluster, environment, request):
     argo_git_tag = "v4.0.3"
     # Argo Workflows Helm chart version (different from app version)
     # See: https://github.com/argoproj/argo-helm/releases
-    # Chart v0.48.2 includes Argo Workflows v4.0.3
-    chart_version = "0.48.2"
+    # Chart v1.0.5 includes Argo Workflows v4.0.3
+    chart_version = "1.0.5"
     installed_by_fixture = False
 
     # Step 1: Check if Argo is already fully installed (CRDs + controller)
