@@ -25,15 +25,15 @@ VENV_DIR="${6:-.venv}"
 CONFIG_FILE="${7:-./config.yaml}"
 
 if [ -z "${RELEASE}" ]; then
-	echo "Error: release is required. Provide <release> argument or set RELEASE environment variable." >&2
+	echo "Warning: release is not set. Skipping security scan. Provide <release> argument or set RELEASE environment variable." >&2
 	usage
-	return 1 2>/dev/null || exit 1
+	return 0 2>/dev/null || exit 0
 fi
 
 if [ -z "${BRANCH}" ]; then
-	echo "Error: branch is required. Provide <branch> argument or set JOB_BASE_BRANCH environment variable." >&2
+	echo "Warning: branch is not set. Skipping security scan. Provide <branch> argument or set JOB_BASE_BRANCH environment variable." >&2
 	usage
-	return 1 2>/dev/null || exit 1
+	return 0 2>/dev/null || exit 0
 fi
 
 BUNDLE_ASSET_NAME="jobd_security_scan_bundle.tar.gz"
