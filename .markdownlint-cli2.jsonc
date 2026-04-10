@@ -8,6 +8,8 @@
     "**/tests/e2e/**",
     "**/helm-charts-k8s/README.md",
     "**/internal-example/**",
-    "**/tests/pytests/**"
+    "**/.claude/**",
+    "**/tests/pytests/**",
+    "**/knowledge/**"
   ]
 }
