@@ -7,6 +7,7 @@
     "**/docs/cicd/**",
     "**/tests/e2e/**",
     "**/helm-charts-k8s/README.md",
-    "**/internal-example/**"
+    "**/internal-example/**",
+    "**/tests/pytests/**"
   ]
 }

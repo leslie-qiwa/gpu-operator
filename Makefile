@@ -40,6 +40,9 @@ UTILS_IMAGE_NAME ?= $(IMAGE_NAME)-utils
 UTILS_IMG ?= $(DOCKER_REGISTRY)/$(UTILS_IMAGE_NAME):$(UTILS_IMAGE_TAG)
 DRA_DRIVER_IMAGE_TAG ?= latest
 DRA_DRIVER_IMG = $(DOCKER_REGISTRY)/k8s-gpu-dra-driver:$(DRA_DRIVER_IMAGE_TAG)
+REMEDIATION_CONFIGMAP_UTIL_IMAGE_TAG ?= latest
+REMEDIATION_CONFIGMAP_UTIL_IMAGE_NAME ?= $(IMAGE_NAME)-remediation-configmap-util
+REMEDIATION_CONFIGMAP_UTIL_IMG = $(DOCKER_REGISTRY)/$(REMEDIATION_CONFIGMAP_UTIL_IMAGE_NAME):$(REMEDIATION_CONFIGMAP_UTIL_IMAGE_TAG)
 
 #######################
 # Helm Charts variables
@@ -370,6 +373,18 @@ docker-push-utils: ## Push docker image for utils container.
 .PHONY: docker-save-utils
 docker-save-utils: ## Save the utils container image as tar.gz.
 	docker save $(UTILS_IMG) | gzip > $(IMAGE_NAME)-utils.tar.gz
+
+.PHONY: docker-build-remediation-configmap-util
+docker-build-remediation-configmap-util: ## Build the docker image for remediation configmap util.
+	DOCKER_BUILDKIT=1 docker build -t $(REMEDIATION_CONFIGMAP_UTIL_IMG) --label HOURLY_TAG=$(HOURLY_TAG_LABEL) --build-arg version=$(PROJECT_VERSION) --build-arg release=$(IMAGE_TAG) -f internal/remediation_config_utils_container/Dockerfile internal/remediation_config_utils_container
+
+.PHONY: docker-push-remediation-configmap-util
+docker-push-remediation-configmap-util: ## Push the docker image for remediation configmap util.
+	docker push $(REMEDIATION_CONFIGMAP_UTIL_IMG)
+
+.PHONY: docker-save-remediation-configmap-util
+docker-save-remediation-configmap-util: ## Save the docker image for remediation configmap util.
+	docker save $(REMEDIATION_CONFIGMAP_UTIL_IMG) | gzip > $(IMAGE_NAME)-remediation-configmap-util.tar.gz
 
 .PHONY: docker-build-env
 docker-build-env: ## Build the docker shell container.

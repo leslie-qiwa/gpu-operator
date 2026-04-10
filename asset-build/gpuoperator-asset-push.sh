@@ -23,6 +23,8 @@ copy_artifacts () {
     cp /gpu-operator/gpu-operator-helm-k8s.tgz $BUNDLE_DIR/gpu-operator-helm-k8s-$RELEASE.tgz
     # copy gpu operator OLM bundle package
     cp /gpu-operator/gpu-operator-olm-bundle.tar.gz $BUNDLE_DIR/gpu-operator-olm-bundle-$RELEASE.tar.gz
+    # copy remediation configmap util container image
+    cp /gpu-operator/gpu-operator-remediation-configmap-util.tar.gz $BUNDLE_DIR/gpu-operator-remediation-configmap-util-$RELEASE.tar.gz
     # list the artifacts copied out
     ls -la $BUNDLE_DIR
 }
@@ -43,6 +45,9 @@ docker_push () {
     # push OLM bundle image
     docker load -i /gpu-operator/gpu-operator-olm-bundle.tar.gz
     docker push docker.io/amdpsdo/gpu-operator-bundle:$RELEASE
+    # push remediation configmap util image
+    docker load -i /gpu-operator/gpu-operator-remediation-configmap-util.tar.gz
+    docker push docker.io/amdpsdo/gpu-operator-remediation-configmap-util:$RELEASE
 }
 
 helm_push () {
