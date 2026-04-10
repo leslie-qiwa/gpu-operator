@@ -7,6 +7,7 @@ Default diagnostic collection script that runs automatically on test failures wh
 ### Features
 
 **Auto-Detection**: Automatically detects deployed components and collects relevant logs:
+
 - GPU Operator (namespace: `kube-amd-gpu`)
 - DRA Driver (namespace: `kube-amd-gpu-dra`)
 - Metrics Exporter:
@@ -20,6 +21,7 @@ Default diagnostic collection script that runs automatically on test failures wh
 **Collected Data**:
 
 *Kubernetes Deployments:*
+
 - Pod logs (current + previous if available)
 - Pod descriptions and YAML manifests
 - Namespace events
@@ -36,6 +38,7 @@ Default diagnostic collection script that runs automatically on test failures wh
   - Kubernetes version
 
 *Docker Deployments:*
+
 - Container list and status
 - Container logs (last 5000 lines)
 - Container inspect output
@@ -43,6 +46,7 @@ Default diagnostic collection script that runs automatically on test failures wh
 - amdgpuhealth output (if available on host)
 
 *Package Deployments (Debian/RPM):*
+
 - Package information and status
 - Installed files list
 - Systemd service status and logs (last 5000 lines)
@@ -53,6 +57,7 @@ Default diagnostic collection script that runs automatically on test failures wh
 - Log files (`/var/log/amd-metrics-exporter`)
 
 **DRA API Version Detection**: Automatically detects and uses the correct DRA API version:
+
 - `v1` (Kubernetes 1.34+, GA)
 - `v1beta2` (Kubernetes 1.33+, OpenShift 4.20+)
 - `v1beta1` (Kubernetes 1.32-1.33)
@@ -87,7 +92,7 @@ KUBECONFIG=/path/to/kubeconfig ./tests/pytests/scripts/default-tech-support.sh
 ### Environment Variables
 
 | Variable | Default | Description |
-|----------|---------|-------------|
+| -------- | ------- | ----------- |
 | `KUBECONFIG` | `/etc/kubernetes/admin.conf` | Path to kubeconfig file |
 | `GPU_OPERATOR_NAMESPACE` | `kube-amd-gpu` | GPU Operator namespace |
 | `DRA_DRIVER_NAMESPACE` | `kube-amd-gpu-dra` | DRA Driver namespace |
@@ -98,7 +103,8 @@ KUBECONFIG=/path/to/kubeconfig ./tests/pytests/scripts/default-tech-support.sh
 Creates a tarball: `techsupport-<timestamp>.tgz`
 
 Structure:
-```
+
+```text
 techsupport-20260402_120000/
 ├── kube-amd-gpu/                    # GPU Operator namespace
 │   ├── pods.json
@@ -149,17 +155,20 @@ techsupport-20260402_120000/
 The script automatically detects and collects from all three deployment modes:
 
 **1. Kubernetes Deployment** (default):
+
 - Detection: Checks for namespace `kube-amd-exporter`
 - Collected: Pod logs, events, YAML manifests
 - Collection method: kubectl (runs locally on test runner)
 
 **2. Docker Containers**:
+
 - Detection: Gets GPU nodes via kubectl, checks Docker on each node
 - Collected: Container logs, inspect output, stats, amdgpuhealth
 - Collection method: kubectl debug pod + chroot /host (remote execution)
 - Fallback: If no GPU nodes found, checks local Docker
 
 **3. Package Installation** (Debian/RPM):
+
 - Detection: Gets GPU nodes via kubectl, checks dpkg/rpm on each node
 - Collected: Package info, systemd logs, config files, runtime data
 - Collection method: kubectl debug pod + chroot /host (remote execution)
@@ -168,6 +177,7 @@ The script automatically detects and collects from all three deployment modes:
 ### Remote Collection for Standalone Tests
 
 For Docker and package deployments (standalone tests), the script:
+
 1. Queries GPU nodes using: `kubectl get nodes -l feature.node.kubernetes.io/amd-gpu=true`
 2. For each node, spawns an ephemeral debug pod: `kubectl debug node/<name>`
 3. Runs commands via `chroot /host` to access the actual host filesystem
@@ -177,7 +187,8 @@ This enables collection from remote nodes where Docker/packages are deployed,
 while the test runner (where script executes) only needs kubectl access.
 
 **Architecture:**
-```
+
+```text
 Test Runner (script runs here)
      |
      | kubectl debug
@@ -194,6 +205,7 @@ All three variants are checked **independently** - the script will collect from 
 To add support for a new component:
 
 1. **Add namespace detection**:
+
    ```bash
    NEW_COMPONENT_NS="${NEW_COMPONENT_NAMESPACE:-default-namespace}"
    if namespace_exists "${NEW_COMPONENT_NS}"; then
@@ -203,6 +215,7 @@ To add support for a new component:
    ```
 
 2. **Add custom resource collection** (if applicable):
+
    ```bash
    collect_custom_resources "api.group.com" "resourcetype" "${OUTPUT_DIR}/resourcetype.yaml"
    ```
@@ -212,17 +225,21 @@ To add support for a new component:
 ### Troubleshooting
 
 **Script fails with permission errors**:
+
 - Ensure proper RBAC permissions for the service account
 - Check KUBECONFIG points to valid config with cluster-admin or sufficient permissions
 
 **Missing logs for certain pods**:
+
 - Check pod status - terminated pods may have no current logs
 - Previous logs require at least one container restart
 
 **DRA resources not collected**:
+
 - Verify DRA API is available: `kubectl api-resources | grep resource.k8s.io`
 - Check if DynamicResourceAllocation feature gate is enabled (K8s 1.32-1.33)
 
 **Large tarball size**:
+
 - Adjust `--tail=5000` in pod log collection to reduce size
 - Consider filtering out verbose pods

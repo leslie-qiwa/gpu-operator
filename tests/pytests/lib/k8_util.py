@@ -283,6 +283,10 @@ def k8_create_custom_resource(cr_spec : dict) -> (int, str, str):
         else:
             resp = custom_objects_api.create_cluster_custom_object(group, version, plural, cr_spec)
     except ApiException as e:
+        if e.status == 409:  # Ignore if already exists
+            cr_name = cr_spec.get('metadata', {}).get('name', 'unknown')
+            Logger.debug(f"CustomResource {cr_name} already exists (409)")
+            return 0, "", ""
         Logger.error(f"Failed to create deviceconfig-cr, error: {e}")
         return -1, "", str(e)
     except Exception as e:
@@ -525,6 +529,9 @@ def k8_create_cluster_role(cluster_role_name : str, rules : List) -> (int, str, 
         api_response = api.create_cluster_role(cluster_role)
         return 0, "", ""
     except ApiException as e:
+        if e.status == 409:  # Ignore if already exists
+            Logger.debug(f"ClusterRole {cluster_role_name} already exists (409)")
+            return 0, "", ""
         return -1, "", str(e)
 
 def k8_create_role_binding_generic(crb_name: str, cluster_role_name: str, subject_kind: str, subject_name: str, namespace: None,) -> (int, str, str):
@@ -567,6 +574,9 @@ def k8_create_role_binding_generic(crb_name: str, cluster_role_name: str, subjec
         api.create_cluster_role_binding(cluster_role_binding)
         return 0, "", ""
     except ApiException as e:
+        if e.status == 409:  # Ignore if already exists
+            Logger.debug(f"ClusterRoleBinding {crb_name} already exists (409)")
+            return 0, "", ""
         return -1, "", str(e)
 
 @log_arguments
@@ -1316,6 +1326,9 @@ def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : 
     try:
         api_response = api.create_namespaced_config_map(namespace, config_map)
     except ApiException as e:
+        if e.status == 409:  # Ignore if already exists
+            Logger.debug(f"ConfigMap {configmap_name} already exists (409)")
+            return 0, "", ""
         Logger.error(f"Failed to create configmap, error : {e}")
         return -1, "", str(e)
     return 0, "", ""
@@ -1323,7 +1336,7 @@ def k8_create_configmap(namespace : str, configmap_name : str, configmap_file : 
 @log_arguments
 def k8_delete_configmap(namespace : str, configmap_name : str):
     """
-    API to create configmap in a k8-cluster
+    API to delete configmap in a k8-cluster. Ignores 404 errors (resource already deleted).
 
     Example: kubectl delete configmap --namespace kube-amd-gpu exporter-config
     """
@@ -1333,8 +1346,11 @@ def k8_delete_configmap(namespace : str, configmap_name : str):
     try:
         api_response = api.delete_namespaced_config_map(configmap_name, namespace)
     except ApiException as e:
-        Logger.debug(f"Failed to delete config-map, error : {e}")
-        return -1, "", str(e)
+        if e.status != 404:  # Ignore if already deleted
+            Logger.debug(f"Failed to delete config-map, error : {e}")
+            return -1, "", str(e)
+        else:
+            Logger.debug(f"ConfigMap {configmap_name} not found (already deleted)")
     return 0, "", ""
 
 def k8_get_node_address(node_info, address_type = "InternalIP"):
@@ -1422,7 +1438,7 @@ def k8_uncordon_node(node_name):
 @log_arguments
 def k8_delete_cluster_role(cluster_role_name):
     """
-    API to delete cluster-role
+    API to delete cluster-role. Ignores 404 errors (resource already deleted).
 
     Example: kubectl delete clusterrole metrics
     """
@@ -1430,8 +1446,11 @@ def k8_delete_cluster_role(cluster_role_name):
     try:
         api_response = rbac_api.delete_cluster_role(cluster_role_name)
     except ApiException as e:
-        Logger.debug(f"Failed to delete cluster-role {cluster_role_name}, error {e}")
-        return -1, "", str(e)
+        if e.status != 404:  # Ignore if already deleted
+            Logger.debug(f"Failed to delete cluster-role {cluster_role_name}, error {e}")
+            return -1, "", str(e)
+        else:
+            Logger.debug(f"ClusterRole {cluster_role_name} not found (already deleted)")
     return 0, "", ""
 
 @log_arguments
@@ -1654,7 +1673,7 @@ def k8_patch_deployment(deployment, namespace, new_toleration, tolerate_add):
 @log_arguments
 def k8_patch_config_map(config_map_name, namespace, body):
     """
-    API to modify config-map
+    API to modify config-map. Creates the ConfigMap if it doesn't exist (404).
     """
     api = client.CoreV1Api()
     Logger.info(f"-> Patching ConfigMap: {config_map_name}")
@@ -1662,6 +1681,13 @@ def k8_patch_config_map(config_map_name, namespace, body):
         api.patch_namespaced_config_map(name=config_map_name, namespace=namespace, body=body)
     except ApiException as e:
         Logger.error(f"Could not patch ConfigMap {config_map_name}: {e}")
+        if e.status == 404:
+            try:
+                Logger.info(f"ConfigMap {config_map_name} not found, creating it...")
+                api.create_namespaced_config_map(namespace=namespace, body=body)
+                return 0, "", ""
+            except ApiException as ae:
+                Logger.error(f"Could not create ConfigMap {config_map_name}: {ae}")
         return -1, "", str(e)
     return 0, "", ""
 
@@ -1688,15 +1714,18 @@ def k8_patch_daemonset(daemonset_name, namespace, body):
 @log_arguments
 def k8_delete_daemonset(namespace : str, daemonset_name : str):
     """
-    API to delete daemonset
+    API to delete daemonset. Ignores 404 errors (resource already deleted).
     """
     api = client.AppsV1Api()
     Logger.info(f"Deleting DaemonSet: {daemonset_name}")
     try:
         api.delete_namespaced_daemon_set(name=daemonset_name, namespace=namespace)
     except ApiException as e:
-        Logger.error(f"Could not delete DaemonSet {daemonset_name}: {e}")
-        return -1, "", str(e)
+        if e.status != 404:  # Ignore if already deleted
+            Logger.error(f"Could not delete DaemonSet {daemonset_name}: {e}")
+            return -1, "", str(e)
+        else:
+            Logger.debug(f"DaemonSet {daemonset_name} not found (already deleted)")
     return 0, "", ""
 
 @log_arguments
@@ -1904,16 +1933,19 @@ def k8_get_node_health(node_name : str, namespace : str):
 @log_arguments
 def k8_delete_cluster_role_binding(cluster_role_name):
     """
-    API to delete cluster-role
+    API to delete cluster-role-binding. Ignores 404 errors (resource already deleted).
 
-    Example: kubectl delete clusterrole metrics
+    Example: kubectl delete clusterrolebinding metrics
     """
     rbac_api = client.RbacAuthorizationV1Api()
     try:
         api_response = rbac_api.delete_cluster_role_binding(cluster_role_name)
     except ApiException as e:
-        Logger.debug(f"Failed to delete cluster-role-binding {cluster_role_name}, error {e}")
-        return -1, "", str(e)
+        if e.status != 404:  # Ignore if already deleted
+            Logger.debug(f"Failed to delete cluster-role-binding {cluster_role_name}, error {e}")
+            return -1, "", str(e)
+        else:
+            Logger.debug(f"ClusterRoleBinding {cluster_role_name} not found (already deleted)")
     return 0, "", ""
 
 @log_arguments
@@ -1933,13 +1965,16 @@ def k8_create_service_account(sa_name : str, namespace : str) -> (int, str, str)
     try:
         api_response = api.create_namespaced_service_account(namespace = namespace, body = sa)
     except ApiException as ae:
+        if ae.status == 409:  # Ignore if already exists
+            Logger.debug(f"ServiceAccount {sa_name} already exists (409)")
+            return 0, "", ""
         return -1, "", str(ae)
     return 0, "", ""
 
 @log_arguments
 def k8_delete_service_account(sa_name : str, namespace : str) -> (int, str, str):
     """
-    API to delete service-account
+    API to delete service-account. Ignores 404 errors (resource already deleted).
 
     Example: kubectl delete serviceaccount exporter-client
     """
@@ -1947,8 +1982,11 @@ def k8_delete_service_account(sa_name : str, namespace : str) -> (int, str, str)
     try:
         api_response = api.delete_namespaced_service_account(sa_name, namespace)
     except ApiException as e:
-        Logger.debug(f"Failed to delete service-account {sa_name} error : {e}")
-        return -1, "", str(e)
+        if e.status != 404:  # Ignore if already deleted
+            Logger.debug(f"Failed to delete service-account {sa_name} error : {e}")
+            return -1, "", str(e)
+        else:
+            Logger.debug(f"ServiceAccount {sa_name} not found (already deleted)")
     return 0, "", ""
 
 @log_arguments

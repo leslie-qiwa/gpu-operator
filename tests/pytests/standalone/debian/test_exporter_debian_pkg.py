@@ -701,3 +701,32 @@ def test_exporter_port_scan(gpu_cluster, deploy_debian_package, environment):
             K8Helper.triage(environment, (int(address_port_map[0]['port']) == 5000),
                             f"Unexpected port opened by amd-metrics-exporter.service in default deployment, {address_port_map}")
 
+def test_exporter_amdgpuhealth_hostpath(gpu_cluster, deploy_debian_package, environment):
+    global Logger
+
+    # Check if amdgpuhealth utility exists and is executable on each node - /var/lib/amd-metrics-exporter
+    for node in gpu_cluster.cluster_nodes:
+        if node.is_gpu_node():
+            # Check if directory exists
+            cmd = "test -d /var/lib/amd-metrics-exporter"
+            ret_code, resp_stdout, resp_stderr = node.run_command(cmd)
+            K8Helper.triage(environment, ret_code == 0, f"Directory /var/lib/amd-metrics-exporter does not exist")
+            Logger.debug(f"Directory /var/lib/amd-metrics-exporter exists")
+
+            # List directory contents
+            cmd = "ls -la /var/lib/amd-metrics-exporter"
+            ret_code, resp_stdout, resp_stderr = node.run_command(cmd)
+            Logger.info(f"Contents of /var/lib/amd-metrics-exporter:\n{resp_stdout}")
+
+            # Check if file exists
+            cmd = "test -f /var/lib/amd-metrics-exporter/amdgpuhealth"
+            ret_code, resp_stdout, resp_stderr = node.run_command(cmd)
+            K8Helper.triage(environment, ret_code == 0, f"File /var/lib/amd-metrics-exporter/amdgpuhealth does not exist")
+            Logger.debug(f"File exists check passed for /var/lib/amd-metrics-exporter/amdgpuhealth")
+
+            # Check if file is executable
+            cmd = "test -x /var/lib/amd-metrics-exporter/amdgpuhealth"
+            ret_code, resp_stdout, resp_stderr = node.run_command(cmd)
+            K8Helper.triage(environment, ret_code == 0, f"File /var/lib/amd-metrics-exporter/amdgpuhealth is not executable")
+            Logger.debug(f"File executable check passed for /var/lib/amd-metrics-exporter/amdgpuhealth")
+

@@ -138,9 +138,6 @@
         },
         {
             "name": "GPU_GFX_ACTIVITY",
-            "driver-support" : {
-                "fini" : "6.14.14"
-            },
             "gpu-support": [
                 {
                     "gpu" : ["MI210", "MI250", "MI325X", "MI325X-VF", "MI300X", "MI350X"],
@@ -151,9 +148,6 @@
         },
         {
             "name": "GPU_UMC_ACTIVITY",
-            "driver-support" : {
-                "fini" : "6.14.14"
-            },
             "gpu-support": [
                 {
                     "gpu" : ["MI210", "MI250", "MI325X", "MI325X-VF", "MI300X", "MI350X"],
@@ -741,10 +735,7 @@
                     "gpu-agent": "stats.power_usage",
                     "amd-smi": "gpu_metrics.average_socket_power"
                 }
-            ],
-            "exporter-support" : {
-                "fini" : "v1.4.1"
-            }
+            ]
         },
         {
             "name": "GPU_TOTAL_VRAM",

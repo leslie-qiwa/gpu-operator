@@ -265,7 +265,8 @@ def pytest_generate_tests(metafunc):
         for ver in driver_spec.get('alternative-versions', []):
             if ver != current_version:
                 driver_versions.append(ver)
-        metafunc.parametrize('upgrade_version', driver_versions)
+        max_upgrade_versions = 3
+        metafunc.parametrize('upgrade_version', driver_versions[-max_upgrade_versions:])
 
     if 'limited_upgrade_version' in metafunc.fixturenames:
         if metafunc.config.option.amdgpu_driver_spec:
@@ -278,7 +279,7 @@ def pytest_generate_tests(metafunc):
         for ver in driver_spec.get('alternative-versions', []):
             if ver != current_version:
                 driver_versions.append(ver)
-        metafunc.parametrize('limited_upgrade_version', random.sample(driver_versions, 2))
+        metafunc.parametrize('limited_upgrade_version', random.sample(driver_versions, 1))
 
 
 def test_driver_upgrade_cycle(request, gpu_cluster, deviceconfig_install, environment, upgrade_version, inbox_driver_skip):

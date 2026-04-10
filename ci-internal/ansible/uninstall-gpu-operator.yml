@@ -177,3 +177,14 @@
     - name: Display completion message
       debug:
         msg: "GPU Operator uninstalled successfully"
+
+- name: Cleanup GPU operator artifacts from all nodes
+  hosts: all
+  become: yes
+  gather_facts: no
+  tasks:
+    - name: Remove amd-metrics-exporter amdgpuhealth utility
+      file:
+        path: /var/lib/amd-metrics-exporter/amdgpuhealth
+        state: absent
+      ignore_errors: yes

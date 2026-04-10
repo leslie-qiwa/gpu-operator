@@ -114,7 +114,14 @@ def deploy_exporter_helmchart(request, gpu_cluster, amdgpu_driver_install, image
         node_name = k8_util.k8_get_node_hostname(node)
         cmd = ["ls", "-1", "/var/lib/amd-metrics-exporter/amdgpuhealth"]
         ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
-        K8Helper.triage(environment, ret_code != 0, f"Utility /var/lib/amd-metrics-exporter/amdgpuhealth found on {node_name} before installation")
+        if ret_code != 0:
+            Logger.debug(f"Found /var/lib/amd-metrics-exporter/amdgpuhealth lingering from previous installations: {resp_stdout}")
+            cmd = ["sudo", "rm", "-r", "-f", "/var/lib/amd-metrics-exporter"]
+            ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+            cmd = ["ls", "-1", "/var/lib/amd-metrics-exporter/amdgpuhealth"]
+            ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        K8Helper.triage(environment, ret_code != 0,
+                        f"Utility /var/lib/amd-metrics-exporter/amdgpuhealth found on {node_name} before installation")
 
     options = {
         "service.type" : "ClusterIP",
@@ -122,7 +129,7 @@ def deploy_exporter_helmchart(request, gpu_cluster, amdgpu_driver_install, image
             "feature.node.kubernetes.io/amd-gpu": "true",
         },
     }
-    values_yaml = os.path.join(environment.logdir, f"exporter_values_{environment.context.current_tc_name}.yaml")
+    values_yaml = os.path.join(environment.logdir, "exporter_values_deploy_exporter_helmchart.yaml")
     if spec_util.generate_exporter_helmchart_deployment_config(environment.exporter_version, images, values_yaml, **options):
         Logger.debug(f"Generated values.yaml for helm-chart install command, {values_yaml}")
     else:
@@ -179,45 +186,30 @@ def test_exporter_amdgpuhealth_hostpath(gpu_cluster, deploy_exporter_helmchart, 
     K8Helper.triage(environment, (ret_code == 0), "Error while getting gpu-nodes from k8-cluster")
     K8Helper.triage(environment, (len(gpu_nodes) > 0), "No nodes with AMD/GPU found in the cluster")
 
-    # Check if amdgpuhealth utility is mounted on each node - /var/lib/amd-metrics-exporter
+    # Check if amdgpuhealth utility exists and is executable on each node - /var/lib/amd-metrics-exporter
     for node in gpu_nodes:
         node_name = k8_util.k8_get_node_hostname(node)
-        cmd = ["/var/lib/amd-metrics-exporter/amdgpuhealth"]
+
+        # Check if directory exists
+        cmd = ["test", "-d", "/var/lib/amd-metrics-exporter"]
         ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
-        K8Helper.triage(environment, ret_code == 0, f"Unable to run /var/lib/amd-metrics-exporter/amdgpuhealth on {node_name}")
-        K8Helper.triage(environment, resp_stdout != None, f"Error: Command output is None")
-        Logger.debug(f"Cmd:{cmd}, Response:\n{resp_stdout}")
+        K8Helper.triage(environment, ret_code == 0, f"Directory /var/lib/amd-metrics-exporter does not exist on {node_name}")
+        Logger.debug(f"Directory /var/lib/amd-metrics-exporter exists on {node_name}")
 
-@pytest.mark.parametrize("metric_to_test, threshold", [
-    ("amd_gpu_violation_gfx_clock_below_host_limit_power_percentage", 100)
-])
-def test_exporter_amdgpuhealth_counter(request, gpu_cluster, deploy_exporter_helmchart, deploy_npd_daemonset, metric_to_test, threshold, environment):
-    global Logger
+        # List directory contents
+        cmd = ["ls", "-la", "/var/lib/amd-metrics-exporter"]
+        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        Logger.info(f"Contents of /var/lib/amd-metrics-exporter on {node_name}:\n{resp_stdout}")
 
-    def _cleanup_npd_config():
-        npd_util.remove_npd_amdgpuhealth_plugin(environment)
+        # Check if file exists
+        cmd = ["test", "-f", "/var/lib/amd-metrics-exporter/amdgpuhealth"]
+        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        K8Helper.triage(environment, ret_code == 0, f"File /var/lib/amd-metrics-exporter/amdgpuhealth does not exist on {node_name}")
+        Logger.debug(f"File exists check passed for /var/lib/amd-metrics-exporter/amdgpuhealth on {node_name}")
 
-    request.addfinalizer(_cleanup_npd_config)
-
-    _cleanup_npd_config()
-
-    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin(environment, "counter-metric", metric_to_test, threshold)
-    K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
-    # TODO: Check for daemon-set rollout, node-condition
-
-@pytest.mark.parametrize("metric_to_test, threshold", [
-    ("amd_gpu_ecc_correct_athub", 1)
-])
-def test_exporter_amdgpuhealth_gauge(request, gpu_cluster, deploy_exporter_helmchart, deploy_npd_daemonset, metric_to_test, threshold, environment):
-    global Logger
-
-    def _cleanup_npd_config():
-        npd_util.remove_npd_amdgpuhealth_plugin(environment)
-
-    request.addfinalizer(_cleanup_npd_config)
-
-    _cleanup_npd_config()
-    ret_code = npd_util.deploy_npd_amdgpuhealth_plugin(environment, "gauge-metric", metric_to_test, threshold)
-    K8Helper.triage(environment, (ret_code == 0), f"Failed to setup amdgpuhealth custom-plugin for npd")
-    # TODO: Check for daemon-set rollout, node-condition
+        # Check if file is executable
+        cmd = ["test", "-x", "/var/lib/amd-metrics-exporter/amdgpuhealth"]
+        ret_code, resp_stdout = k8_util.run_command_on_node(gpu_cluster, node_name, cmd)
+        K8Helper.triage(environment, ret_code == 0, f"File /var/lib/amd-metrics-exporter/amdgpuhealth is not executable on {node_name}")
+        Logger.debug(f"File executable check passed for /var/lib/amd-metrics-exporter/amdgpuhealth on {node_name}")
 

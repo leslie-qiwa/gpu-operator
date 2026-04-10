@@ -37,7 +37,7 @@ Logger = logging.getLogger("lib.dra_util")
 # DRA API Group
 DRA_API_GROUP = "resource.k8s.io"
 
-# We only support structured API: v1beta1 (K8s 1.32-1.33) or v1 (K8s 1.34+)
+# We only support structured API: v1beta1 (K8s 1.32), v1beta2 (K8s 1.33+/OpenShift 4.20+), or v1 (K8s 1.34+)
 # The older opaque API (v1alpha2, v1alpha3) is not supported
 # API version is determined dynamically at runtime via check_dra_api_available()
 
@@ -215,11 +215,16 @@ def check_dra_api_available() -> Tuple[bool, str, str]:
             Logger.error(error_msg)
             return False, error_msg, ""
 
-        # Prefer v1 (GA) over v1beta1 (beta)
+        # Prefer v1 (GA) over v1beta2 over v1beta1 (beta)
         # Filter to only structured API versions we support
         if "v1" in dra_versions:
             dra_api_version = "v1"
             Logger.info("Using DRA v1 API (GA, enabled by default in K8s 1.34+)")
+        elif "v1beta2" in dra_versions:
+            dra_api_version = "v1beta2"
+            Logger.info(
+                "Using DRA v1beta2 API (Beta). Available in OpenShift 4.20+ and K8s 1.33+"
+            )
         elif "v1beta1" in dra_versions:
             dra_api_version = "v1beta1"
             Logger.warning(
@@ -250,7 +255,7 @@ def check_dra_api_available() -> Tuple[bool, str, str]:
                 )
         else:
             # Check if only older opaque API versions are available
-            unsupported_msg = f"Only unsupported DRA API versions found: {dra_versions}. Requires v1beta1 (K8s 1.32+) or v1 (K8s 1.34+)"
+            unsupported_msg = f"Only unsupported DRA API versions found: {dra_versions}. Requires v1beta1 (K8s 1.32+), v1beta2 (K8s 1.33+/OpenShift 4.20+), or v1 (K8s 1.34+)"
             Logger.error(unsupported_msg)
             return False, unsupported_msg, ""
 
