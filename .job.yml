@@ -141,7 +141,7 @@ builds:
     owners: ["email:srivatsa.sangli@amd.com"]
     artifacts:
      - /gpu-operator/artifacts.metadata
-     - /gpu-operator/amdpsdo-gpu-operator-olm-bundle.tar.gz
+     - /gpu-operator/gpu-operator-olm-bundle.tar.gz
 
   # Following are added for specific v1.4.2 DME release
   build-external-device-metrics-exporter-v1.4.2:

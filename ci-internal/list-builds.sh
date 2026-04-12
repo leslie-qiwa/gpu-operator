@@ -30,7 +30,7 @@ declare -a build_artifacts=(
     "kernel-module-management-worker"
     "kernel-module-management-operator"
     "kernel-module-management-webhook-server"
-    "gpu-operator-olm-bundle"
+    "gpu-operator-bundle"
 )
 
 function usage() {

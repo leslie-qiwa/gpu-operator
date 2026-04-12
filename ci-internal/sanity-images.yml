@@ -202,7 +202,7 @@ images:
       kind: container
 
     gpu-operator:
-      image: container://docker.io/amdpsdo/gpu-operator-olm-bundle
+      image: container://docker.io/amdpsdo/gpu-operator-bundle
       metadata: file:///gpu-operator/artifacts.metadata
       kind: olm-bundle
       version: v1.5.0
