@@ -31,6 +31,7 @@ declare -a build_artifacts=(
     "kernel-module-management-operator"
     "kernel-module-management-webhook-server"
     "gpu-operator-bundle"
+    "k8s-gpu-dra-driver"
 )
 
 function usage() {

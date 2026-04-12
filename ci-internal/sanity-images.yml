@@ -240,7 +240,7 @@ images:
     device-plugin:
       key: devicePlugin.devicePluginImage
       location: container://<registry>/rocm/k8s-device-plugin
-      version: latest
+      version: rhubi-latest
       kind: container
 
     dra-driver-image:
@@ -258,7 +258,7 @@ images:
     node-labeller:
       key: devicePlugin.nodeLabellerImage
       location: container://<registry>/rocm/k8s-device-plugin
-      version: labeller-latest
+      version: labeller-rhubi-latest
       kind: container
 
     init-container-image:
