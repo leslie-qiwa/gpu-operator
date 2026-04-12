@@ -41,6 +41,9 @@ DRA_API_GROUP = "resource.k8s.io"
 # The older opaque API (v1alpha2, v1alpha3) is not supported
 # API version is determined dynamically at runtime via check_dra_api_available()
 
+# Module-level cache for DRA API version to avoid repeated detection
+_DRA_API_VERSION_CACHE = ""
+
 
 def check_feature_gate_enabled(
     component_names: List[str],
@@ -287,145 +290,125 @@ def get_dra_api_version(environment=None) -> str:
     """
     Determine the DRA structured API version available in the cluster.
 
-    This function checks for a cached version in the environment object first
-    (if provided), otherwise detects it by calling check_dra_api_available().
+    This function checks for a cached version (module-level or environment object)
+    to avoid repeated API detection and logging.
 
     Args:
         environment: Optional test environment object that may have cached dra_api_version
 
     Returns: API version string (v1beta1 or v1), or empty string if not available
     """
+    global _DRA_API_VERSION_CACHE
+
+    # Check module-level cache first
+    if _DRA_API_VERSION_CACHE:
+        return _DRA_API_VERSION_CACHE
+
     # Check if version is cached in environment
     if environment and hasattr(environment, "dra_api_version"):
+        _DRA_API_VERSION_CACHE = environment.dra_api_version
         return environment.dra_api_version
 
-    # Otherwise detect it
+    # Otherwise detect it and cache
     _, _, api_version = check_dra_api_available()
+    _DRA_API_VERSION_CACHE = api_version
     return api_version
 
 
-def create_resource_class(
-    name: str, driver_name: str = "gpu.amd.com", parameters: Optional[Dict] = None
-) -> Tuple[int, str, str]:
-    """
-    Create a ResourceClass for DRA
-
-    Equivalent kubectl command:
-        kubectl apply -f - <<EOF
-        apiVersion: resource.k8s.io/<version>
-        kind: ResourceClass
-        metadata:
-          name: <name>
-        driverName: <driver_name>
-        EOF
-
-    Args:
-        name: Name of the ResourceClass
-        driver_name: DRA driver name (default: gpu.amd.com)
-        parameters: Optional parameters for the ResourceClass
-
-    Returns:
-        Tuple of (return_code, stdout, stderr)
-    """
-    global Logger
-
-    resource_class = {
-        "apiVersion": f"{DRA_API_GROUP}/{get_dra_api_version()}",
-        "kind": "ResourceClass",
-        "metadata": {"name": name},
-        "driverName": driver_name,
-    }
-
-    if parameters:
-        resource_class["parametersRef"] = parameters
-
-    # Use existing k8_util helper for creating custom resources
-    ret_code, stdout, stderr = k8_util.k8_create_custom_resource(resource_class)
-    if ret_code == 0:
-        Logger.info(f"Created ResourceClass: {name}")
-    else:
-        Logger.error(f"Failed to create ResourceClass {name}: {stderr}")
-    return ret_code, stdout, stderr
-
-
-def delete_resource_class(name: str) -> Tuple[int, str, str]:
-    """
-    Delete a ResourceClass
-
-    Equivalent kubectl command:
-        kubectl delete resourceclass <name>
-
-    Args:
-        name: Name of the ResourceClass to delete
-
-    Returns:
-        Tuple of (return_code, stdout, stderr)
-    """
-    global Logger
-
-    # Use existing k8_util helper for deleting custom resources
-    ret_code, stdout, stderr = k8_util.k8_delete_custom_resource(
-        group=DRA_API_GROUP,
-        version=get_dra_api_version(),
-        plural="resourceclasses",
-        namespace=None,  # ResourceClass is cluster-scoped
-        name=name,
-    )
-    if ret_code == 0:
-        Logger.info(f"Deleted ResourceClass: {name}")
-    else:
-        Logger.error(f"Failed to delete ResourceClass {name}: {stderr}")
-    return ret_code, stdout, stderr
+# Note: ResourceClass creation/deletion functions removed (create_resource_class, delete_resource_class).
+# DRA API evolved from ResourceClass (v1alpha2) to DeviceClass (v1alpha3/v1).
+# Tests now use the default 'gpu.amd.com' DeviceClass created by Helm installation.
+# If you need to create custom DeviceClass objects for testing, use kubectl directly
+# or k8_util.k8_create_custom_resource() with the appropriate DeviceClass manifest.
 
 
 def create_resource_claim(
     name: str,
     namespace: str,
     resource_class: str,
-    allocation_mode: str = "WaitForFirstConsumer",
+    device_count: int = 1,
 ) -> Tuple[int, str, str]:
     """
     Create a ResourceClaim
 
-    Equivalent kubectl command:
+    Equivalent kubectl command (uses detected DRA API version):
         kubectl apply -f - <<EOF
-        apiVersion: resource.k8s.io/<version>
+        apiVersion: resource.k8s.io/<detected-version>  # v1beta1 or v1
         kind: ResourceClaim
         metadata:
           name: <name>
           namespace: <namespace>
         spec:
-          resourceClassName: <resource_class>
-          allocationMode: <allocation_mode>
+          devices:
+            requests:
+              - name: gpu-0
+                exactly:
+                  deviceClassName: <resource_class>
+                  allocationMode: ExactCount
+                  count: 1
         EOF
+
+    Note: API version is auto-detected via get_dra_api_version().
+    In DRA v1, allocationMode values are:
+    - ExactCount: Request exact count of devices
+    - All: Request all available devices
+
+    This is different from PV's WaitForFirstConsumer/Immediate modes.
+
+    For node affinity, use Pod nodeSelector instead of ResourceClaim constraints.
+    Pin the Pod to a specific node, and DRA will allocate from that node's devices.
 
     Args:
         name: Name of the ResourceClaim
         namespace: Namespace for the ResourceClaim
-        resource_class: Name of the ResourceClass to use
-        allocation_mode: Allocation mode (WaitForFirstConsumer or Immediate)
+        resource_class: Name of the DeviceClass to use (e.g., 'gpu.amd.com')
+        device_count: Number of GPU devices to request (default: 1)
 
     Returns:
         Tuple of (return_code, stdout, stderr)
     """
     global Logger
 
+    # Build device requests for structured parameters API (v1/v1beta1)
+    # v1 API requires 'exactly' or 'firstAvailable' within each request
+    device_requests = []
+    for i in range(device_count):
+        device_requests.append(
+            {
+                "name": f"gpu-{i}",
+                "exactly": {
+                    "deviceClassName": resource_class,
+                    "allocationMode": "ExactCount",  # DRA allocation mode (not PV mode)
+                    "count": 1,
+                },
+            }
+        )
+
     resource_claim = {
         "apiVersion": f"{DRA_API_GROUP}/{get_dra_api_version()}",
         "kind": "ResourceClaim",
         "metadata": {"name": name, "namespace": namespace},
         "spec": {
-            "resourceClassName": resource_class,
-            "allocationMode": allocation_mode,
+            "devices": {
+                "requests": device_requests,
+            },
         },
     }
+
+    # Log the actual spec for debugging
+    Logger.debug(
+        f"Creating ResourceClaim with spec:\n{json.dumps(resource_claim, indent=2)}"
+    )
 
     # Use existing k8_util helper for creating custom resources
     ret_code, stdout, stderr = k8_util.k8_create_custom_resource(resource_claim)
     if ret_code == 0:
-        Logger.info(f"Created ResourceClaim: {name} in namespace {namespace}")
+        Logger.info(
+            f"Created ResourceClaim: {name} requesting {device_count} GPU(s) in namespace {namespace}"
+        )
     else:
         Logger.error(f"Failed to create ResourceClaim {name}: {stderr}")
+        Logger.error(f"ResourceClaim spec was:\n{json.dumps(resource_claim, indent=2)}")
     return ret_code, stdout, stderr
 
 
@@ -595,11 +578,12 @@ def create_pod_with_resource_claim(
     image: str = "rocm/pytorch:latest",
     command: Optional[List[str]] = None,
     wait_for_running: bool = False,
+    node_selector: Optional[Dict[str, str]] = None,
 ) -> Tuple[int, str, str]:
     """
     Create a Pod that uses a ResourceClaim
 
-    Equivalent kubectl command:
+    Equivalent kubectl command (example uses detected DRA API version):
         kubectl apply -f - <<EOF
         apiVersion: v1
         kind: Pod
@@ -607,10 +591,11 @@ def create_pod_with_resource_claim(
           name: <pod_name>
           namespace: <namespace>
         spec:
+          nodeSelector:
+            kubernetes.io/hostname: <node-name>
           resourceClaims:
           - name: gpu-claim
-            source:
-              resourceClaimName: <resource_claim_name>
+            resourceClaimName: <resource_claim_name>  # Direct reference (v1/v1beta1)
           containers:
           - name: gpu-container
             image: <image>
@@ -620,6 +605,9 @@ def create_pod_with_resource_claim(
               - name: gpu-claim
         EOF
 
+    Note: The resourceClaims format uses resourceClaimName directly (no 'source' wrapper)
+    for both DRA v1 and v1beta1 APIs when referencing an existing claim.
+
     Args:
         pod_name: Name of the Pod
         namespace: Namespace for the Pod
@@ -627,6 +615,7 @@ def create_pod_with_resource_claim(
         image: Container image to use
         command: Command to run in the container
         wait_for_running: Wait for pod to reach Running state
+        node_selector: Optional node selector dict (e.g., {"kubernetes.io/hostname": "node-name"})
 
     Returns:
         Tuple of (return_code, stdout, stderr)
@@ -645,7 +634,7 @@ def create_pod_with_resource_claim(
             "resourceClaims": [
                 {
                     "name": "gpu-claim",
-                    "source": {"resourceClaimName": resource_claim_name},
+                    "resourceClaimName": resource_claim_name,
                 }
             ],
             "containers": [
@@ -659,12 +648,19 @@ def create_pod_with_resource_claim(
         },
     }
 
+    # Add nodeSelector if provided
+    if node_selector:
+        pod_spec["spec"]["nodeSelector"] = node_selector
+
+    # Log the actual spec for debugging
+    Logger.debug(f"Creating Pod with spec:\n{json.dumps(pod_spec, indent=2)}")
+
     try:
         v1 = client.CoreV1Api()
         result = v1.create_namespaced_pod(namespace=namespace, body=pod_spec)
         Logger.info(f"Created Pod {pod_name} with ResourceClaim {resource_claim_name}")
 
-        # Optionally wait for pod to be running using k8_util method
+        # Optionally wait for pod to be running
         if wait_for_running:
             ret_code = k8_util.k8_check_pod_running(
                 namespace=namespace,
@@ -677,8 +673,10 @@ def create_pod_with_resource_claim(
                 return ret_code, "", "Pod failed to reach Running state"
 
         return 0, json.dumps(result.to_dict(), default=str), ""
+
     except ApiException as e:
         Logger.error(f"Failed to create Pod {pod_name}: {e}")
+        Logger.error(f"Pod spec was:\n{json.dumps(pod_spec, indent=2)}")
         return -1, "", str(e)
 
 

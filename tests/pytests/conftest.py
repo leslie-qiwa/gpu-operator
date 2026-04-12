@@ -394,12 +394,13 @@ def gpu_cluster(request, environment):
     assert ret_code == 0, "Failed to collect nodes from cluster"
     nodes = list()
     for node in k8_nodes:
+        node_name = node['metadata']['name']
         k8_version = node['status']['node_info']['kubelet_version']
         node_ip = k8_util.k8_get_node_address(node)
         if 'node-role.kubernetes.io/control-plane' in node['metadata']['labels']:
-            nodes.append(common.Node(node_ip, None, None, None, "master", k8_version))
+            nodes.append(common.Node(node_ip, None, None, None, "master", k8_version, node_name))
         else:
-            nodes.append(common.Node(node_ip, None, None, None, "worker", k8_version))
+            nodes.append(common.Node(node_ip, None, None, None, "worker", k8_version, node_name))
     k8_cluster_inst = common.k8_cluster.BuildK8Cluster(nodes)
     k8_cluster_inst.k8_kube_config = environment.kube_config_file
     assert len(k8_cluster_inst.cluster_nodes) > 0, f"Failed to collect nodes from k8/cluster"

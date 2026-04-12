@@ -37,7 +37,7 @@ Logger = logging.getLogger("lib.common")
 def log_struct_members(struct):
     Logger.info("Struct contents: " + ", ".join(f"{k}={v}" for k, v in vars(struct).items()))
 
-Node = namedtuple("Node", ["IpAddress", "Username", "Password", "Identity", "NodeType", "K8Version"])
+Node = namedtuple("Node", ["IpAddress", "Username", "Password", "Identity", "NodeType", "K8Version", "NodeName"])
 PodInfo = namedtuple("PodInfo", ["PodName", "NumInstances", "ContainerCount"])
 
 class TestbedType(Enum):
@@ -46,7 +46,7 @@ class TestbedType(Enum):
     STANDALONE  = 3
 
 class cluster_node(object):
-    def __init__(self, ip_address = "localhost", user_name = None, password = None, identity = None):
+    def __init__(self, ip_address = "localhost", user_name = None, password = None, identity = None, node_name = None, node_type = None):
         self._ip_address = ip_address
         self._user_name = user_name
         self._password = password
@@ -57,6 +57,8 @@ class cluster_node(object):
         self._num_gpus = 0
         self._connect_kwargs = {}
         self._amdgpu_driver_version = None
+        self._node_name = node_name
+        self._node_type = node_type
         if self._password:
             self._connect_kwargs['password'] = self._password
         elif self._identity:
@@ -162,6 +164,22 @@ class cluster_node(object):
     @k8_version.setter
     def k8_version(self, k8_version):
         self._k8_version = k8_version
+
+    @property
+    def node_name(self):
+        return self._node_name
+
+    @node_name.setter
+    def node_name(self, name):
+        self._node_name = name
+
+    @property
+    def node_type(self):
+        return self._node_type
+
+    @node_type.setter
+    def node_type(self, ntype):
+        self._node_type = ntype
 
     def is_gpu_node(self):
         if self._gpu_series != None:
@@ -406,7 +424,7 @@ class k8_cluster(cluster):
         cluster_nodes = list()
         master_nodes = list()
         for node in nodes:
-            c_node = cluster_node(node.IpAddress, node.Username, node.Password, node.Identity)
+            c_node = cluster_node(node.IpAddress, node.Username, node.Password, node.Identity, node.NodeName, node.NodeType)
             c_node.k8_version = node.K8Version
             cluster_nodes.append(c_node)
             if node.NodeType == "master":
