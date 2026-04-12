@@ -292,3 +292,6 @@ dependencies:
   - reference: tests/jobs/sim
   internal:
   - reference: tests/jobs/sim
+  tests/e2e:
+  - reference: tests/jobs/sim
+
